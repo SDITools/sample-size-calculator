@@ -11,6 +11,13 @@ body {
 /* Set the main body/text font */
 p, a {
     font-family: "adelle-sans",helvetica,arial,sans-serf;
+    font-size: 13px;
+}
+
+/* The ggiraph package does a weird overwriting of the text style */
+/* and makes it a serif font. So, this corrects for that */
+text {
+     font-family: "adelle-sans",helvetica,arial,sans-serf;
 }
 
 /* Main results output */
@@ -30,7 +37,7 @@ h3 {
 /* Titles at the top of each panel */
 .chart-title {
   font-family: "adelle-sans",helvetica,arial,sans-serf;
-  font-size: 18px;
+  font-size: 16px;
   font-style: italic;
   font-weight: bold;
   color: #444;

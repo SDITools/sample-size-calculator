@@ -16,6 +16,8 @@ library(dplyr)
 library(purrr)
 library(RColorBrewer)
 library(scales)
+library(rvg)       # For interactive / tooltips
+library(ggiraph)   # For interactive / tooltips
 ```
 
 Row
@@ -46,8 +48,6 @@ _This means you're looking to detect a change in the conversion rate from **`r t
 
 Select whether you want the test to be **one-tailed** or **two-tailed**. _Note: results within your testing tool may vary if you select one-tailed and your testing tool uses two-tailed and vice versa._ 
 
-**Reference:** [Differences Between One-Tailed and Two-Tailed Test](https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faq-what-are-the-differences-between-one-tailed-and-two-tailed-tests/)
-
 ```{r}
 # One-tailed or two-tailed
 radioButtons("tail", label = NA,
@@ -55,6 +55,10 @@ radioButtons("tail", label = NA,
                             "Two-tailed" = "two.sided"), 
              selected = "one.sided")
 ```
+
+**Tip**: If you are specifically looking for a difference that is only in _one_ direction (e.g., a conversion rate that goes _up_), select **One-tailed**. If you are simply interested in whether there is _any_ difference (up _or_ down), select **Two-tailed**.
+
+**Reference:** [Differences Between a One-Tailed and a Two-Tailed Test](https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faq-what-are-the-differences-between-one-tailed-and-two-tailed-tests/)
 
 Row  {data-height=400}
 -----------------------------
@@ -205,9 +209,9 @@ output$mineffect_time <- renderPlot({
 Row
 -----------------------------
 
-### Power ($1 - \beta$): Reduce Risk of a False Negative
+### Power ($1 - \beta$): Reduce Risk of a False "No Difference"
 
-Set the **statistical power**. The _higher_ you set the statistical power, the _less likely_ the statistical results will return a _false negative_ (aka, a Type II error).
+Set the **statistical power**. The _higher_ you set the statistical power, the _less likely_ the statistical results will return a _false "no difference"_ (aka, a false negative or a Type II error).
 
 ```{r}
 # Statistical Power
@@ -218,9 +222,9 @@ sliderInput(inputId = "power",
             min = 50, max = 100, value = 80, width = "300px", post = "%")
 ```
 
-### Confidence ($1 - \alpha$): Reduce Risk of a False Positive
+### Confidence ($1 - \alpha$): Reduce Risk of a False Difference
 
-Set the **statistical confidence**. The higher you set the statistical confidence, the _less likely_ the statistical results will return a _false positive_ (aka a Type I error).
+Set the **statistical confidence**. The higher you set the statistical confidence, the _less likely_ the statistical results will return a _false difference_ (aka, a false positive or a Type I error).
 
 ```{r}
 # Confidence
@@ -305,7 +309,7 @@ output$sample_size <- renderText({
 ### Error Risk Visualization
 
 ```{r error-grid}
-plotOutput("error_matrix")
+ggiraphOutput("error_matrix")
 
 # Define theme
 error_theme <- theme_light() +
@@ -321,7 +325,7 @@ error_theme <- theme_light() +
         legend.position = "none")
 
 # Build the plot
-output$error_matrix <- renderPlot({
+output$error_matrix <- renderggiraph({
   
   # Set up a data frame to display the 2x2 matrix. For each of the columns --
   # created as vectors -- the values are: top left (true positive), top right
@@ -330,14 +334,14 @@ output$error_matrix <- renderPlot({
   # out which quadrant (facet) for which the value is used. The "(100*x)^0.5"
   # is because we're using areas to represent percentages. So, we've got to
   # do some square rooting.
-  error_df <- data.frame(reality = factor(c("POSITIVE", "NEGATIVE", "POSITIVE", "NEGATIVE"),
-                                          levels = c("POSITIVE", "NEGATIVE")),
-                         result = factor(c("POSITIVE", "POSITIVE", "NEGATIVE", "NEGATIVE"),
-                                         levels = c("POSITIVE", "NEGATIVE")),
-                         label = c(paste0("True Positive\n", input$power, "%"), 
-                                   paste0("False Positive\n", 100 - input$confidence, "%"),
-                                   paste0("False Negative\n", 100 - input$power, "%"), 
-                                   paste0("True Negative\n", input$confidence, "%")),
+  error_df <- data.frame(reality = factor(c("DIFFERENCE", "NO DIFFERENCE", "DIFFERENCE", "NO DIFFERENCE"),
+                                          levels = c("DIFFERENCE", "NO DIFFERENCE")),
+                         result = factor(c("DIFFERENCE", "DIFFERENCE", "NO DIFFERENCE", "NO DIFFERENCE"),
+                                         levels = c("DIFFERENCE", "NO DIFFERENCE")),
+                         label = c(paste0("True Difference\n", input$power, "%"), 
+                                   paste0("False Difference\n", 100 - input$confidence, "%"),
+                                   paste0("False \"No Difference\"\n", 100 - input$power, "%"), 
+                                   paste0("True \"No Difference\"\n", input$confidence, "%")),
 
                          # The min and max coords for the false positive/false negative quadrants
                          rect_max_error = c(0, (100*(100-input$confidence))^0.5, 100,0),
@@ -357,22 +361,25 @@ output$error_matrix <- renderPlot({
                          rect_max_coin_x = c(100,5000^0.5,100,5000^0.5),
                          rect_max_coin_y = c(5000^0.5,5000^0.5,100,100),
                          
-                         # The coin toss text. We're just going to put this in the top right
-                         # quadrant. Really starting to push ggplot2 here!
-                         coin_toss_text = c("", "Coin\nToss","","")
+                         # The tooltips used for each rectangle
+                         tooltips_error = c("", "This is a tooltip", "This is a tooltip", ""),
+                         tooltips_good = c("This is a tooltip", "", "", "This is a tooltip")
+                         
                          )
   
   # Build the plot
   error_gg <- ggplot(data = error_df, mapping = aes(label = label)) +
 
     # Fill in the "Correct Conclusion" quadrants as green
-    geom_rect(aes(xmin = rect_min_good_x, xmax = rect_max_good_x,
-                  ymin = rect_min_good_y, ymax = rect_max_good_y),
+    geom_rect_interactive(aes(xmin = rect_min_good_x, xmax = rect_max_good_x,
+                  ymin = rect_min_good_y, ymax = rect_max_good_y,
+                  tooltip = tooltips_good),
               fill = "#B8D8BA") +
    
     # Draw the rectangles that will show how much the risk is
-    geom_rect(aes(xmin = rect_min_error, xmax = rect_max_error,
-                  ymin = rect_min_error, ymax = rect_max_error),
+    geom_rect_interactive(aes(xmin = rect_min_error, xmax = rect_max_error,
+                  ymin = rect_min_error, ymax = rect_max_error,
+                  tooltip = tooltips_error),
               fill = "#EF959D") +
 
     # Draw the "coin toss" box
@@ -400,12 +407,15 @@ output$error_matrix <- renderPlot({
     # Apply the theme
     error_theme 
   
-  # Return the plot
-  error_gg
+  # Return the plot. We're using ggiraph for this so that we can use the
+  # tooltips. See https://rdrr.io/cran/ggiraph/man/geom_rect_interactive.html and
+  # https://stackoverflow.com/questions/40199178/shiny-how-to-use-ggiraph
+  ggiraph(code = print(error_gg),
+          selection = "none")
 })
 ```
 
 Row
 -----------------------------
 
-_This calculator is built with R using the `power.prop.test()` function (for the actual calculations), which performs a two-sample test for proportions. Read more in the [documentation for the function](https://www.rdocumentation.org/packages/stats/versions/3.4.3/topics/power.prop.test)._
+_This calculator is built with R using the `power.prop.test()` function (for the actual calculations), which performs a two-sample test for proportions. Read more in the [documentation for the function](https://www.rdocumentation.org/packages/stats/versions/3.4.3/topics/power.prop.test). The source code for the calculator itself is availabe [on Github](https://github.com/SDITools/sample-size-calculator)._

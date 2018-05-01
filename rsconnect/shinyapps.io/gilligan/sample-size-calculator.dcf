@@ -1,0 +1,10 @@
+name: sample-size-calculator
+title: Sample Size Calculator
+username:
+account: gilligan
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 317165
+bundleId: 1350081
+url: https://gilligan.shinyapps.io/sample-size-calculator/
+when: 1525206812.04277
