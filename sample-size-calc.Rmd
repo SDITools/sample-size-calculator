@@ -1,0 +1,411 @@
+---
+title: "Sample Size Calculator"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    css: styles.css
+    vertical_layout: scroll
+runtime: shiny
+---
+
+Enter values below to calculate the number of visitors needed for each variation in an A/B test to reliably detect the desired conversion rate lift.
+
+```{r setup}
+library(ggplot2)
+library(dplyr)
+library(purrr)
+library(RColorBrewer)
+library(scales)
+```
+
+Row
+-----------------------------
+
+### Baseline Conversion Rate and Estimated Lift %
+
+Enter the **baseline conversion rate** for the page, experience, and audience you hope to impact (e.g., enter "5" for "5%"):
+
+```{r}
+# Baseline conversion rate
+numericInput("baseline", 
+             label = NA, value = 5,
+             width = "100px")
+```
+
+Enter the **estimated lift percentage** you would need to see in order to make a decision (positive or negative):
+
+```{r}
+# Minimal detectable effect
+numericInput("min_effect", 
+             label = NA, value = 10, width = "100px")
+```
+
+_This means you're looking to detect a change in the conversion rate from **`r textOutput("baseline3", inline = TRUE)`** to at least **`r   textOutput("p2_value1", inline = TRUE)`**._
+
+### One-Tailed vs. Two-Tailed
+
+Select whether you want the test to be **one-tailed** or **two-tailed**. _Note: results within your testing tool may vary if you select one-tailed and your testing tool uses two-tailed and vice versa._ 
+
+**Reference:** [Differences Between One-Tailed and Two-Tailed Test](https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faq-what-are-the-differences-between-one-tailed-and-two-tailed-tests/)
+
+```{r}
+# One-tailed or two-tailed
+radioButtons("tail", label = NA,
+             choices = list("One-tailed" = "one.sided", 
+                            "Two-tailed" = "two.sided"), 
+             selected = "one.sided")
+```
+
+Row  {data-height=400}
+-----------------------------
+
+### Not Sure What Lift Percentage to Enter?
+
+How many visit(or)s do you get to the experience, on average, **over the course of 30 days**?
+
+```{r}
+# 30-day visit(or)s
+numericInput("avg_traffic", 
+             label = NA, value = 100000,
+             width = "150px")
+```
+
+How many total variations are you testing, including the control (e.g., a standard A/B test would be "2")?
+
+```{r}
+# of variations
+numericInput("variations",
+             label = NA, value = 2,
+             width = "100px")
+```
+
+Given the baseline conversion rate entered above (`r textOutput("baseline2", inline=TRUE)`), the chart at right shows the minimum lift you can expect to detect based on how long you run the test. You need to be **outside** the gray shaded area to reach statistical significance with the given power & confidence selections below.
+
+The horizontal line is the **Lift %** entered above. Try adjusting that value to see the impact on the expected runtime.
+
+### Runtime Based on Lift %
+
+```{r}
+
+# Output the time vs. minimal effect chart
+plotOutput("mineffect_time")
+
+# Calculate the values and build the chart
+output$mineffect_time <- renderPlot({
+  
+  req(input$avg_traffic > 0)
+  req(input$variations >= 2)
+  req(input$confidence < 100)
+
+  # Function to calculate the minimum effect. This is, really, calculating
+  # "p2" -- the second probabiliy -- given the other various inputs.
+  calc_min_effect <- function(days_running){
+
+    # Calculate the number of observations per group.
+    n = round(days_running * input$avg_traffic / 30 / input$variations,0)
+    
+    # Run the test to get the results
+    calc_results <- power.prop.test(n = n,
+                                    p1 = input$baseline/100,
+                                    sig.level = (100 - input$confidence)/100,
+                                    power = input$power/100,
+                                    alternative = input$tail)
+    
+    # Create a data frame that has the # of days run, the minimal positive lift
+    # detectable, and the negative minimal effect detectable.
+    result <- data.frame(days = days_running,
+                         lift_pos = calc_results$p2/calc_results$p1 - 1) %>%
+      mutate(lift_neg = -1*lift_pos)
+  }
+
+  # Create a data frame with "days" of 1 to 30 and then the minimal
+  # detectable affect for each day
+  min_by_day <- map_dfr(seq(1:30), calc_min_effect)
+  
+  # Hold on to your socks. We're going to find the first day that is *above*
+  # the minimum effect. This will tell us how many days we can expect to need
+  # to run the test to detect the minimal lift desired.
+  days_needed <- ifelse(input$min_effect < 0,
+                        which.min(abs(min_by_day$lift_neg-input$min_effect/100)) + 1,
+                        which.min(abs(min_by_day$lift_pos-input$min_effect/100)) + 1)
+  
+  # If the days is less than 25, we want to put the text on the left
+  # side of the line. Otherwise, we want it on the right side.
+  if(days_needed < 25){
+    days_text_hjust = 0
+    days_text_nudge = 0.5
+  } else {
+    days_text_hjust = 1
+    days_text_nudge = -0.5
+  }
+  
+  # If the minimum effect can't be hit in 30 days, we don't want to show a
+  # line, and we want a message to that effect. So, set a few values to be
+  # used in the relevant geoms to make the line disappear (size = 0) and to
+  # set the text description
+  if(days_needed == 31){
+    days_needed = 15    # Set the message in the center
+    days_text_hjust = 0.5
+    days_size = 0
+    days_text_val = "The test would take\nmore than 30 days."
+  } else {
+    days_size = 1
+    days_text_val = paste0(days_needed, " Days")
+  }
+  
+  # Plot it!
+  ggplot(data = min_by_day) +
+    
+    # Draw the shaded band
+    geom_ribbon(mapping = aes(x = days, ymin = lift_neg, ymax = lift_pos),
+                alpha = 0.1) +
+    
+    # Draw the x-axis and y-axis
+    geom_hline(aes(yintercept = 0), colour = "gray10") +
+    geom_vline(aes(xintercept = 0)) +
+
+    # Draw the minimum effect line
+    geom_hline(aes(yintercept = input$min_effect/100), colour = "#416fba",
+               size = 1, linetype = "dashed") +
+    
+    # Add a text label to the minimum effect ine
+    geom_text(data = data.frame(dummy = NA),
+              mapping = aes(x = 30, y = input$min_effect/100,
+                            label = paste0(input$min_effect, "%")),
+              vjust = 0, hjust = 1, fontface = "bold", colour = "#416fba",
+              nudge_y = min_by_day$lift_pos[20] - min_by_day$lift_pos[30],
+              size = 4.5) +
+    
+    # Draw the "days needed" line and text
+    geom_vline(aes(xintercept = days_needed), colour = "#416fba",
+               size = days_size, linetype = "dashed") +
+    geom_text(data = data.frame(dummy = NA),
+              mapping = aes(x = days_needed, y = min_by_day$lift_pos[2],
+                            label = days_text_val),
+              hjust = days_text_hjust, fontface = "bold", colour = "#416fba",
+              nudge_x = days_text_nudge, size = 4.5) +
+    
+    # Draw the intersection point
+    geom_point(aes(x = days_needed, y = input$min_effect/100), 
+               size = 2 * days_size,
+               colour = "gray30") +
+    
+    labs(x = "Test Duration (Days)", y = "Lift % (Relative)") +
+    scale_y_continuous(expand = c(0,0), labels = percent) +
+    scale_x_continuous(expand = c(0,0), limits = c(0,31)) +
+    theme_light() +
+    theme(text = element_text(size = 14),
+          panel.border = element_blank(),
+          axis.line.y = element_blank(),
+          panel.grid.minor = element_blank(),
+          axis.title.x = element_text(margin = margin(t = 10, r = 0, b = 0, l = 0)))
+})
+```
+
+Row
+-----------------------------
+
+### Power ($1 - \beta$): Reduce Risk of a False Negative
+
+Set the **statistical power**. The _higher_ you set the statistical power, the _less likely_ the statistical results will return a _false negative_ (aka, a Type II error).
+
+```{r}
+# Statistical Power
+sliderInput(inputId = "power",
+            label = div(style='width:300px;',
+                        div(style='float:left;', 'MORE Likely'),
+                        div(style='float:right;', 'LESS Likely')),
+            min = 50, max = 100, value = 80, width = "300px", post = "%")
+```
+
+### Confidence ($1 - \alpha$): Reduce Risk of a False Positive
+
+Set the **statistical confidence**. The higher you set the statistical confidence, the _less likely_ the statistical results will return a _false positive_ (aka a Type I error).
+
+```{r}
+# Confidence
+sliderInput(inputId = "confidence",
+            label = div(style='width:300px;',
+                        div(style='float:left;', 'MORE Likely'),
+                        div(style='float:right;', 'LESS Likely')),
+            min = 50, max = 100, value = 95, width = '300px', post = "%")
+```
+
+Row  {data-height=400}
+-----------------------------
+
+### Sample Size
+
+The **number of visit(or)s per variation** should be at least:
+
+```{r output}
+h1(textOutput("sample_size"))
+
+em("This is the number of visitors required to detect a change in the conversion rate from ",
+   strong(textOutput("baseline", inline = TRUE)), "to at least",
+   strong(textOutput("p2_value", inline = TRUE)), "in a",
+   textOutput("tail", inline = TRUE), "test.")
+
+h3("Power:", strong(textOutput("power", inline = TRUE),"%"))
+
+h3("Confidence:", strong(textOutput("confidence", inline = TRUE),"%"))
+```
+
+The impact of these two values is reflected in the diagram at right. The gray dotted line reflects a coin toss (statistical power = 50% and statistical confidence = 50%).
+
+```{r calculations}
+# Return each of the input values so they can be re-displayed. We have to repeat some
+# of these because we're outputting them multiple times.
+output$baseline <- renderText(paste0(input$baseline,"%"))
+output$baseline2 <- renderText(paste0(input$baseline,"%"))
+output$baseline3 <- renderText(paste0(input$baseline,"%"))
+output$power <- renderText(input$power)
+output$confidence <- renderText(input$confidence)
+output$p2_value <- renderText(paste0(input$baseline * (1 + input$min_effect/100), "%"))
+output$p2_value1 <- renderText(paste0(input$baseline * (1 + input$min_effect/100), "%"))
+output$tail <- renderText(ifelse(input$tail == "one.sided", "one-tailed", "two-tailed"))
+
+# Calculate the sample size
+output$sample_size <- renderText({
+  
+  # Set a value for when the # of observations is so low that they might as well
+  # just flip a coin
+  coin_flip_message <- "0 (Just Flip a Coin!)"
+  
+  # Do some checks to cover the corner cases with different messaging
+  if(input$confidence == 100){
+    results <- "100% Confidence Is Not Achievable"
+  } else if(input$power == 50 & input$confidence == 50){
+    results <- coin_flip_message
+  } else {
+    results <- tryCatch(
+      {calc_n <- power.prop.test(p1 = input$baseline/100,
+                                 p2 = (input$baseline/100) * (1 + input$min_effect/100),
+                                 sig.level = (100 - input$confidence)/100,
+                                 power = input$power/100,
+                                 alternative = input$tail)
+      calc_n <- format(round(calc_n$n), big.mark=",", scientific = FALSE)
+      },
+      error = function(e){
+        return(coin_flip_message)
+      }
+    )
+    
+    # One more check to see if things landed such that we still rounded to 0
+    if(results == 0){
+      results <- coin_flip_message
+    }
+  }
+  
+  # Return the results
+  results
+})
+```
+
+### Error Risk Visualization
+
+```{r error-grid}
+plotOutput("error_matrix")
+
+# Define theme
+error_theme <- theme_light() +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title = element_text(size = 16, face = "bold"),
+        panel.grid = element_blank(),
+        panel.spacing = unit(0, "lines"),
+        panel.background = element_blank(),
+        panel.border = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(colour = "black", size = 14),
+        legend.position = "none")
+
+# Build the plot
+output$error_matrix <- renderPlot({
+  
+  # Set up a data frame to display the 2x2 matrix. For each of the columns --
+  # created as vectors -- the values are: top left (true positive), top right
+  # (false positive), bottom left (false negative), and bottom right (true
+  # negative). If you need to decode what's going on, you just have to figure
+  # out which quadrant (facet) for which the value is used. The "(100*x)^0.5"
+  # is because we're using areas to represent percentages. So, we've got to
+  # do some square rooting.
+  error_df <- data.frame(reality = factor(c("POSITIVE", "NEGATIVE", "POSITIVE", "NEGATIVE"),
+                                          levels = c("POSITIVE", "NEGATIVE")),
+                         result = factor(c("POSITIVE", "POSITIVE", "NEGATIVE", "NEGATIVE"),
+                                         levels = c("POSITIVE", "NEGATIVE")),
+                         label = c(paste0("True Positive\n", input$power, "%"), 
+                                   paste0("False Positive\n", 100 - input$confidence, "%"),
+                                   paste0("False Negative\n", 100 - input$power, "%"), 
+                                   paste0("True Negative\n", input$confidence, "%")),
+
+                         # The min and max coords for the false positive/false negative quadrants
+                         rect_max_error = c(0, (100*(100-input$confidence))^0.5, 100,0),
+                         rect_min_error = c(0,0, 100 - (100*(100-input$power))^0.5,0),
+                         
+                         # The min/max for the true positive/true negative quadrants
+                         rect_min_good_x = c(100 - (100*input$power)^0.5,0,0,0),
+                         rect_min_good_y = c(0,0,0,100 - (100*input$confidence)^0.5),
+                         rect_max_good_x = c(100,0,0,(100*input$confidence)^0.5),
+                         rect_max_good_y = c((100*input$power)^0.5,0,0,100),
+                         
+                         # The coin toss rectangle coordinates. Since this is built as facets,
+                         # these are actually four static boxes that look like "one box" based
+                         # on how they're plotted
+                         rect_min_coin_x = c(100 - 5000^0.5,0,100 - 5000^0.5,0),
+                         rect_min_coin_y = c(0,0,100 - 5000^0.5,100 - 5000^0.5),
+                         rect_max_coin_x = c(100,5000^0.5,100,5000^0.5),
+                         rect_max_coin_y = c(5000^0.5,5000^0.5,100,100),
+                         
+                         # The coin toss text. We're just going to put this in the top right
+                         # quadrant. Really starting to push ggplot2 here!
+                         coin_toss_text = c("", "Coin\nToss","","")
+                         )
+  
+  # Build the plot
+  error_gg <- ggplot(data = error_df, mapping = aes(label = label)) +
+
+    # Fill in the "Correct Conclusion" quadrants as green
+    geom_rect(aes(xmin = rect_min_good_x, xmax = rect_max_good_x,
+                  ymin = rect_min_good_y, ymax = rect_max_good_y),
+              fill = "#B8D8BA") +
+   
+    # Draw the rectangles that will show how much the risk is
+    geom_rect(aes(xmin = rect_min_error, xmax = rect_max_error,
+                  ymin = rect_min_error, ymax = rect_max_error),
+              fill = "#EF959D") +
+
+    # Draw the "coin toss" box
+    geom_rect(aes(xmin = rect_min_coin_x, xmax = rect_max_coin_x,
+                  ymin = rect_min_coin_y, ymax = rect_max_coin_y),
+              fill = NA, colour = "gray70", linetype = "dotted", size=1) +
+    
+    # Draw the axes
+    geom_hline(aes(yintercept=c(0,0,100,100)), size=1, colour="gray40") +
+    geom_vline(aes(xintercept=c(100,0,100,0)), size=1, colour="gray40") +
+
+    # Label the four quadrants
+    geom_text(aes(x=50, y=c(50,50,50,50)), size = 5, fontface = "bold") +
+    
+    # Get rid of padding
+    scale_x_continuous(limits = c(0,100), expand = c(0,0), position = "top") +
+    scale_y_continuous(limits = c(0,100), expand = c(0,0)) +
+    
+    # Make the quadrants by way of faceting
+    facet_grid(result ~ reality, switch = "y") +
+    
+    # Add the labels
+    labs(x = "Reality (Truth)", y = "Test Result (Challenger vs. Control)") +
+    
+    # Apply the theme
+    error_theme 
+  
+  # Return the plot
+  error_gg
+})
+```
+
+Row
+-----------------------------
+
+_This calculator is built with R using the `power.prop.test()` function (for the actual calculations), which performs a two-sample test for proportions. Read more in the [documentation for the function](https://www.rdocumentation.org/packages/stats/versions/3.4.3/topics/power.prop.test)._
