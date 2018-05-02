@@ -20,6 +20,12 @@ text {
      font-family: "adelle-sans",helvetica,arial,sans-serf;
 }
 
+/* Tabsets try to resize to be wayyyy to tall. So, overwrite that. */
+#section-row-1 {
+    height: 230px;
+    flex: 0 0 230px !important;
+}
+
 /* Main results output */
 h1 {
   font-family: "adelle-sans",helvetica,arial,sans-serf;
@@ -31,6 +37,7 @@ h1 {
 
 h3 {
   font-family: "adelle-sans",helvetica,arial,sans-serf;
+  font-size: 18px;
   text-align: center;
 }
 

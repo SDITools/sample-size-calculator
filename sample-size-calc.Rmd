@@ -48,7 +48,7 @@ numericInput("min_effect",
 output$liftmessage <- renderUI({
   if(is.na(input$baseline) | input$baseline == 0 |
      is.na(input$min_effect) | input$min_effect == 0){
-    message <- HTML("<div style=\"color:red;\">Enter a baseline conversion rate and a estimated lift % above.</font>")
+    message <- HTML("<div style=\"color:red;\">Enter a baseline conversion rate and an estimated lift % above.</font>")
   } else {
     message <- HTML(paste0("This means you're looking to detect a change in the conversion rate from ",
                       strong(paste0(input$baseline,"%")), " to at least ",
@@ -58,25 +58,6 @@ output$liftmessage <- renderUI({
 ```
 
 _`r htmlOutput("liftmessage", inline = TRUE)`_
-
-### One-Tailed vs. Two-Tailed
-
-Select whether you want the test to be **one-tailed** or **two-tailed**. _Note: results within your testing tool may vary if you select one-tailed and your testing tool uses two-tailed and vice versa._ 
-
-```{r}
-# One-tailed or two-tailed
-radioButtons("tail", label = NA,
-             choices = list("One-tailed" = "one.sided", 
-                            "Two-tailed" = "two.sided"), 
-             selected = "one.sided")
-```
-
-**Tip**: If you are specifically looking for a difference that is only in _one_ direction (e.g., a conversion rate that goes _up_), select **One-tailed**. If you are simply interested in whether there is _any_ difference (up _or_ down), select **Two-tailed**.
-
-**Reference:** [Differences Between a One-Tailed and a Two-Tailed Test](https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faq-what-are-the-differences-between-one-tailed-and-two-tailed-tests/)
-
-Row  {data-height=400}
------------------------------
 
 ### Traffic Volume and # of Variations
 
@@ -96,11 +77,143 @@ How many total variations are you testing, including the control (e.g., a standa
 numericInput("variations",
              label = NA, value = 2,
              width = "100px")
+
+# Given the baseline conversion rate entered above`r textOutput("baseline2", inline=TRUE)`, the chart at right shows the minimum lift you can expect to detect based on how long you run the test. You need to be **outside** the gray shaded area to reach statistical significance with the given power & confidence selections below.
+# 
+# The horizontal line is the **Lift %** entered above. Try adjusting that value to see the impact on the expected runtime.
+
 ```
 
-Given the baseline conversion rate entered above`r textOutput("baseline2", inline=TRUE)`, the chart at right shows the minimum lift you can expect to detect based on how long you run the test. You need to be **outside** the gray shaded area to reach statistical significance with the given power & confidence selections below.
+Row {.tabset} 
+-----------------------------
 
-The horizontal line is the **Lift %** entered above. Try adjusting that value to see the impact on the expected runtime.
+### 1. Select 1-Tailed vs. 2-Tailed
+
+Select whether you want the test to be **one-tailed** or **two-tailed**. _Note: results within your testing tool may vary if you select one-tailed and your testing tool uses two-tailed and vice versa._ 
+
+```{r}
+# One-tailed or two-tailed
+radioButtons("tail", label = NA,
+             choices = list("One-tailed" = "one.sided", 
+                            "Two-tailed" = "two.sided"), 
+             selected = "one.sided")
+```
+
+**Tip**: If you are specifically looking for a difference that is only in _one_ direction (e.g., a conversion rate that goes _up_), select **One-tailed**. If you are simply interested in whether there is _any_ difference (up _or_ down), select **Two-tailed**.
+
+**Reference:** [Differences Between a One-Tailed and a Two-Tailed Test](https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faq-what-are-the-differences-between-one-tailed-and-two-tailed-tests/)
+
+### 2. Select Confidence ($1 - \alpha$)
+
+Set the **statistical confidence**. The higher you set the statistical confidence, the _less likely_ the statistical results will return a _false difference_ (aka, a false positive or a Type I error).
+
+```{r}
+# Confidence
+sliderInput(inputId = "confidence",
+            label = div(style='width:300px;',
+                        div(style='float:left;', 'MORE Likely'),
+                        div(style='float:right;', 'LESS Likely')),
+            min = 50, max = 99, value = 95, width = '300px', post = "%")
+```
+
+### 3. Select Power ($1 - \beta$)
+
+Set the **statistical power**. The _higher_ you set the statistical power, the _less likely_ the statistical results will return a _false "no difference"_ (aka, a false negative or a Type II error).
+
+```{r}
+# Statistical Power
+sliderInput(inputId = "power",
+            label = div(style='width:300px;',
+                        div(style='float:left;', 'MORE Likely'),
+                        div(style='float:right;', 'LESS Likely')),
+            min = 50, max = 99, value = 80, width = "300px", post = "%")
+```
+
+
+Row
+-----------------------------
+
+### Sample Size
+
+The **number of visit(or)s per variation** should be at least:
+
+```{r output}
+h1(textOutput("sample_size"))
+
+em("This is the number of visitors required to detect a change in the conversion rate from ",
+   strong(textOutput("baseline", inline = TRUE)), "to at least",
+   strong(textOutput("p2_value", inline = TRUE)), "in a",
+   textOutput("tail", inline = TRUE), "test.")
+```
+
+### Selected Test Type, Confidence, and Power
+
+```{r selections}
+h3("Test Type:", strong(textOutput("tail1", inline = TRUE),"%"))
+h3("Confidence:", strong(textOutput("confidence", inline = TRUE),"%"))
+h3("Power:", strong(textOutput("power", inline = TRUE),"%"))
+```
+
+The impact of these values values is reflected in the diagram below. The gray dotted line reflects a coin toss (statistical power = 50% and statistical confidence = 50%).
+
+```{r calculations}
+# Return each of the input values so they can be re-displayed. We have to repeat some
+# of these because we're outputting them multiple times.
+output$baseline <- renderText(paste0(input$baseline,"%"))
+
+# This one gets embedded in a paragraph in a parenthetical, and we want it to just
+# disappear if there is no value yet.
+output$baseline2 <- renderText({
+    if(is.na(input$baseline) | input$baseline == 0){
+      output_value <- ""
+    } else {
+      output_value <- paste0(" (",input$baseline,"%)")
+    }
+  })
+output$power <- renderText(input$power)
+output$confidence <- renderText(input$confidence)
+output$p2_value <- renderText(paste0(input$baseline * (1 + input$min_effect/100), "%"))
+output$p2_value1 <- renderText(paste0(input$baseline * (1 + input$min_effect/100), "%"))
+output$tail <- renderText(ifelse(input$tail == "one.sided", "one-tailed", "two-tailed"))
+output$tail1 <- renderText(ifelse(input$tail == "one.sided", "One-tailed", "Two-tailed"))
+
+# Calculate the sample size
+output$sample_size <- renderText({
+  
+  # Set a value for when the # of observations is so low that they might as well
+  # just flip a coin
+  coin_flip_message <- "0 (Just Flip a Coin!)"
+  
+  # Do some checks to cover the corner cases with different messaging
+  if(input$power == 50 & input$confidence == 50){
+    results <- coin_flip_message
+  } else {
+    results <- tryCatch(
+      {calc_n <- power.prop.test(p1 = input$baseline/100,
+                                 p2 = (input$baseline/100) * (1 + input$min_effect/100),
+                                 sig.level = (100 - input$confidence)/100,
+                                 power = input$power/100,
+                                 alternative = input$tail)
+      calc_n <- format(round(calc_n$n), big.mark=",", scientific = FALSE)
+      },
+      error = function(e){
+        return("N/A")
+      }
+    )
+    
+    # One more check to see if things landed such that we still rounded to 0
+    if(results == 0){
+      results <- coin_flip_message
+    }
+  }
+  
+  # Return the results
+  results
+})
+```
+
+Row  {data-height=400}
+-----------------------------
 
 ### Runtime Based on Lift %
 
@@ -217,112 +330,6 @@ output$mineffect_time <- renderPlot({
           axis.line.y = element_blank(),
           panel.grid.minor = element_blank(),
           axis.title.x = element_text(margin = margin(t = 10, r = 0, b = 0, l = 0)))
-})
-```
-
-Row
------------------------------
-
-### Power ($1 - \beta$): Reduce Risk of a False "No Difference"
-
-Set the **statistical power**. The _higher_ you set the statistical power, the _less likely_ the statistical results will return a _false "no difference"_ (aka, a false negative or a Type II error).
-
-```{r}
-# Statistical Power
-sliderInput(inputId = "power",
-            label = div(style='width:300px;',
-                        div(style='float:left;', 'MORE Likely'),
-                        div(style='float:right;', 'LESS Likely')),
-            min = 50, max = 99, value = 80, width = "300px", post = "%")
-```
-
-### Confidence ($1 - \alpha$): Reduce Risk of a False Difference
-
-Set the **statistical confidence**. The higher you set the statistical confidence, the _less likely_ the statistical results will return a _false difference_ (aka, a false positive or a Type I error).
-
-```{r}
-# Confidence
-sliderInput(inputId = "confidence",
-            label = div(style='width:300px;',
-                        div(style='float:left;', 'MORE Likely'),
-                        div(style='float:right;', 'LESS Likely')),
-            min = 50, max = 99, value = 95, width = '300px', post = "%")
-```
-
-Row  {data-height=400}
------------------------------
-
-### Sample Size
-
-The **number of visit(or)s per variation** should be at least:
-
-```{r output}
-h1(textOutput("sample_size"))
-
-em("This is the number of visitors required to detect a change in the conversion rate from ",
-   strong(textOutput("baseline", inline = TRUE)), "to at least",
-   strong(textOutput("p2_value", inline = TRUE)), "in a",
-   textOutput("tail", inline = TRUE), "test.")
-
-h3("Power:", strong(textOutput("power", inline = TRUE),"%"))
-
-h3("Confidence:", strong(textOutput("confidence", inline = TRUE),"%"))
-```
-
-The impact of these two values is reflected in the diagram at right. The gray dotted line reflects a coin toss (statistical power = 50% and statistical confidence = 50%).
-
-```{r calculations}
-# Return each of the input values so they can be re-displayed. We have to repeat some
-# of these because we're outputting them multiple times.
-output$baseline <- renderText(paste0(input$baseline,"%"))
-
-# This one gets embedded in a paragraph in a parenthetical, and we want it to just
-# disappear if there is no value yet.
-output$baseline2 <- renderText({
-    if(is.na(input$baseline) | input$baseline == 0){
-      output_value <- ""
-    } else {
-      output_value <- paste0(" (",input$baseline,"%)")
-    }
-  })
-output$power <- renderText(input$power)
-output$confidence <- renderText(input$confidence)
-output$p2_value <- renderText(paste0(input$baseline * (1 + input$min_effect/100), "%"))
-output$p2_value1 <- renderText(paste0(input$baseline * (1 + input$min_effect/100), "%"))
-output$tail <- renderText(ifelse(input$tail == "one.sided", "one-tailed", "two-tailed"))
-
-# Calculate the sample size
-output$sample_size <- renderText({
-  
-  # Set a value for when the # of observations is so low that they might as well
-  # just flip a coin
-  coin_flip_message <- "0 (Just Flip a Coin!)"
-  
-  # Do some checks to cover the corner cases with different messaging
-  if(input$power == 50 & input$confidence == 50){
-    results <- coin_flip_message
-  } else {
-    results <- tryCatch(
-      {calc_n <- power.prop.test(p1 = input$baseline/100,
-                                 p2 = (input$baseline/100) * (1 + input$min_effect/100),
-                                 sig.level = (100 - input$confidence)/100,
-                                 power = input$power/100,
-                                 alternative = input$tail)
-      calc_n <- format(round(calc_n$n), big.mark=",", scientific = FALSE)
-      },
-      error = function(e){
-        return("N/A")
-      }
-    )
-    
-    # One more check to see if things landed such that we still rounded to 0
-    if(results == 0){
-      results <- coin_flip_message
-    }
-  }
-  
-  # Return the results
-  results
 })
 ```
 
