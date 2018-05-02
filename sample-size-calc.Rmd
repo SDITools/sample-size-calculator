@@ -30,7 +30,7 @@ Enter the **baseline conversion rate** for the page, experience, and audience yo
 ```{r}
 # Baseline conversion rate
 numericInput("baseline", 
-             label = NA, value = 5,
+             label = NA, value = NA,
              width = "100px")
 ```
 
@@ -39,10 +39,25 @@ Enter the **estimated lift percentage** you would need to see in order to make a
 ```{r}
 # Minimal detectable effect
 numericInput("min_effect", 
-             label = NA, value = 10, width = "100px")
+             label = NA, value = NA, width = "100px")
 ```
 
-_This means you're looking to detect a change in the conversion rate from **`r textOutput("baseline3", inline = TRUE)`** to at least **`r   textOutput("p2_value1", inline = TRUE)`**._
+```{r liftmessage}
+# We're starting with no values for the baseline and MDE, so we want to clearly prompt
+# the user to enter those and, once entered, reiterate the interpretation of those values.
+output$liftmessage <- renderUI({
+  if(is.na(input$baseline) | input$baseline == 0 |
+     is.na(input$min_effect) | input$min_effect == 0){
+    message <- HTML("<div style=\"color:red;\">Enter a baseline conversion rate and a estimated lift % above.</font>")
+  } else {
+    message <- HTML(paste0("This means you're looking to detect a change in the conversion rate from ",
+                      strong(paste0(input$baseline,"%")), " to at least ",
+                      strong(paste0(input$baseline * (1 + input$min_effect/100),"%")),"."))
+  }
+})
+```
+
+_`r htmlOutput("liftmessage", inline = TRUE)`_
 
 ### One-Tailed vs. Two-Tailed
 
@@ -63,14 +78,14 @@ radioButtons("tail", label = NA,
 Row  {data-height=400}
 -----------------------------
 
-### Not Sure What Lift Percentage to Enter?
+### Traffic Volume and # of Variations
 
 How many visit(or)s do you get to the experience, on average, **over the course of 30 days**?
 
 ```{r}
 # 30-day visit(or)s
 numericInput("avg_traffic", 
-             label = NA, value = 100000,
+             label = NA, value = NA,
              width = "150px")
 ```
 
@@ -83,7 +98,7 @@ numericInput("variations",
              width = "100px")
 ```
 
-Given the baseline conversion rate entered above (`r textOutput("baseline2", inline=TRUE)`), the chart at right shows the minimum lift you can expect to detect based on how long you run the test. You need to be **outside** the gray shaded area to reach statistical significance with the given power & confidence selections below.
+Given the baseline conversion rate entered above`r textOutput("baseline2", inline=TRUE)`, the chart at right shows the minimum lift you can expect to detect based on how long you run the test. You need to be **outside** the gray shaded area to reach statistical significance with the given power & confidence selections below.
 
 The horizontal line is the **Lift %** entered above. Try adjusting that value to see the impact on the expected runtime.
 
@@ -99,7 +114,6 @@ output$mineffect_time <- renderPlot({
   
   req(input$avg_traffic > 0)
   req(input$variations >= 2)
-  req(input$confidence < 100)
 
   # Function to calculate the minimum effect. This is, really, calculating
   # "p2" -- the second probabiliy -- given the other various inputs.
@@ -219,7 +233,7 @@ sliderInput(inputId = "power",
             label = div(style='width:300px;',
                         div(style='float:left;', 'MORE Likely'),
                         div(style='float:right;', 'LESS Likely')),
-            min = 50, max = 100, value = 80, width = "300px", post = "%")
+            min = 50, max = 99, value = 80, width = "300px", post = "%")
 ```
 
 ### Confidence ($1 - \alpha$): Reduce Risk of a False Difference
@@ -232,7 +246,7 @@ sliderInput(inputId = "confidence",
             label = div(style='width:300px;',
                         div(style='float:left;', 'MORE Likely'),
                         div(style='float:right;', 'LESS Likely')),
-            min = 50, max = 100, value = 95, width = '300px', post = "%")
+            min = 50, max = 99, value = 95, width = '300px', post = "%")
 ```
 
 Row  {data-height=400}
@@ -261,8 +275,16 @@ The impact of these two values is reflected in the diagram at right. The gray do
 # Return each of the input values so they can be re-displayed. We have to repeat some
 # of these because we're outputting them multiple times.
 output$baseline <- renderText(paste0(input$baseline,"%"))
-output$baseline2 <- renderText(paste0(input$baseline,"%"))
-output$baseline3 <- renderText(paste0(input$baseline,"%"))
+
+# This one gets embedded in a paragraph in a parenthetical, and we want it to just
+# disappear if there is no value yet.
+output$baseline2 <- renderText({
+    if(is.na(input$baseline) | input$baseline == 0){
+      output_value <- ""
+    } else {
+      output_value <- paste0(" (",input$baseline,"%)")
+    }
+  })
 output$power <- renderText(input$power)
 output$confidence <- renderText(input$confidence)
 output$p2_value <- renderText(paste0(input$baseline * (1 + input$min_effect/100), "%"))
@@ -277,9 +299,7 @@ output$sample_size <- renderText({
   coin_flip_message <- "0 (Just Flip a Coin!)"
   
   # Do some checks to cover the corner cases with different messaging
-  if(input$confidence == 100){
-    results <- "100% Confidence Is Not Achievable"
-  } else if(input$power == 50 & input$confidence == 50){
+  if(input$power == 50 & input$confidence == 50){
     results <- coin_flip_message
   } else {
     results <- tryCatch(
@@ -291,7 +311,7 @@ output$sample_size <- renderText({
       calc_n <- format(round(calc_n$n), big.mark=",", scientific = FALSE)
       },
       error = function(e){
-        return(coin_flip_message)
+        return("N/A")
       }
     )
     
@@ -326,6 +346,13 @@ error_theme <- theme_light() +
 
 # Build the plot
 output$error_matrix <- renderggiraph({
+  
+  # We *could* display this even without data, but we're going to blank it
+  # out until values are entered.
+  req(input$baseline > 0)
+  req(input$min_effect > 0)
+  req(input$avg_traffic > 0)
+  req(input$variations >= 2)
   
   # Set up a data frame to display the 2x2 matrix. For each of the columns --
   # created as vectors -- the values are: top left (true positive), top right
@@ -362,8 +389,22 @@ output$error_matrix <- renderggiraph({
                          rect_max_coin_y = c(5000^0.5,5000^0.5,100,100),
                          
                          # The tooltips used for each rectangle
-                         tooltips_error = c("", "This is a tooltip", "This is a tooltip", ""),
-                         tooltips_good = c("This is a tooltip", "", "", "This is a tooltip")
+                         tooltips_error = c("", 
+                                            paste0("If there truly is NOT a difference, ",
+                                                  100 - input$confidence, "% of the time, the test ",
+                                                  "will INCORRECTLY report there IS a difference."), 
+                                            paste0("If there truly IS a difference, ",
+                                                  100 - input$power, "% of the time, the test ",
+                                                  "will INCORRECTLY report there is NOT a difference."), 
+                                            ""),
+                         tooltips_good = c(paste0("If there truly IS a difference, ",
+                                                  input$power, "% of the time, the test ",
+                                                  "will (correctly) report there is a difference."),
+                                           "", 
+                                           "", 
+                                           paste0("If there truly is NOT a difference, ",
+                                                  input$confidence, "% of the time, the test ",
+                                                  "will (correctly) report there is not a difference."))
                          
                          )
   
