@@ -147,6 +147,7 @@ em("This is the number of visitors required to detect a change in the conversion
    strong(textOutput("baseline", inline = TRUE)), "to at least",
    strong(textOutput("p2_value", inline = TRUE)), "in a",
    textOutput("tail", inline = TRUE), "test.")
+
 ```
 
 ### Selected Test Type, Confidence, and Power
@@ -230,6 +231,7 @@ output$mineffect_time <- renderPlot({
   
   req(input$avg_traffic > 0)
   req(input$variations >= 2)
+  req(input$avg_traffic >= 300)   # This would be 10 visit(ors) a day.
 
   # Function to calculate the minimum effect. This is, really, calculating
   # "p2" -- the second probabiliy -- given the other various inputs. The wrinkle
@@ -281,28 +283,29 @@ output$mineffect_time <- renderPlot({
     NA,
     abs(min_by_day$lift_pos-input$min_effect/100)))
   
-  # If the days is less than 25, we want to put the text on the left
-  # side of the line. Otherwise, we want it on the right side.
-  if(days_needed < 25){
-    days_text_hjust = 0
-    days_text_nudge = 0.5
-  } else {
-    days_text_hjust = 1
-    days_text_nudge = -0.5
-  }
-  
   # If the minimum effect can't be hit in 30 days, we don't want to show a
   # line, and we want a message to that effect. So, set a few values to be
   # used in the relevant geoms to make the line disappear (size = 0) and to
-  # set the text description
-  if(days_needed == 31){
-    days_needed = 15    # Set the message in the center
-    days_text_hjust = 0.5
-    days_size = 0
-    days_text_val = "The test would take\nmore than 30 days."
+  # set the text description.
+  if(length(days_needed) == 0){
+    days_needed <-  15    # Set the message in the center
+    days_text_hjust <-  0.5
+    days_size <-  0
+    days_text_val <-  "The test would take\nmore than 30 days."
+    days_text_nudge <- 0
   } else {
     days_size = 1
     days_text_val = paste0(days_needed, " Days")
+    
+    # If the days is less than 25, we want to put the text on the left
+    # side of the line. Otherwise, we want it on the right side.
+    if(days_needed < 25){
+      days_text_hjust <-  0
+      days_text_nudge <-  0.5
+    } else {
+      days_text_hjust <-  1
+      days_text_nudge <-  -0.5
+    }
   }
   
   # And, more fun. Make a data frame that has all of the "minimum effect"
@@ -329,7 +332,7 @@ output$mineffect_time <- renderPlot({
     # Draw the shaded band
     geom_ribbon(mapping = aes(x = days, ymin = lift_neg, ymax = lift_pos),
                 alpha = 0.1) +
-    
+
     # Draw the x-axis and y-axis
     geom_hline(aes(yintercept = 0), colour = "gray10") +
     geom_vline(aes(xintercept = 0)) +
@@ -339,7 +342,7 @@ output$mineffect_time <- renderPlot({
                mapping = aes(yintercept = yintercept), colour = "#416fba",
                size = 1, linetype = "dashed") +
 
-        
+
     # Add a text label to the minimum effect line(s)
     geom_text(data = min_effect_df,
               mapping = aes(x = 30, y = yintercept,
@@ -347,7 +350,7 @@ output$mineffect_time <- renderPlot({
               vjust = 0, hjust = 1, fontface = "bold", colour = "#416fba",
               nudge_y = nudge_y,
               size = 4.5) +
-    
+
     # Draw the "days needed" line and text
     geom_vline(aes(xintercept = days_needed), colour = "#416fba",
                size = days_size, linetype = "dashed") +
@@ -356,10 +359,10 @@ output$mineffect_time <- renderPlot({
                             label = days_text_val),
               hjust = days_text_hjust, fontface = "bold", colour = "#416fba",
               nudge_x = days_text_nudge, size = 4.5) +
-    
+
     # Draw the intersection point(s)
     geom_point(data = min_effect_df,
-               aes(x = days_needed, y = yintercept), 
+               aes(x = days_needed, y = yintercept),
                size = 2 * days_size,
                colour = "gray30") +
     
