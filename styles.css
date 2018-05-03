@@ -11,7 +11,7 @@ body {
 /* Set the main body/text font */
 p, a {
     font-family: "adelle-sans",helvetica,arial,sans-serf;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 /* The ggiraph package does a weird overwriting of the text style */
@@ -45,7 +45,14 @@ h3 {
 .chart-title {
   font-family: "adelle-sans",helvetica,arial,sans-serf;
   font-size: 16px;
-  font-style: italic;
+  font-weight: bold;
+  color: #444;
+}
+
+/* Tabset text */
+#section-row-1 > ul > li > a {
+  font-family: "adelle-sans",helvetica,arial,sans-serf;
+  font-size: 16px;
   font-weight: bold;
   color: #444;
 }
@@ -54,6 +61,11 @@ h3 {
 .shiny-input-container:not(.shiny-input-container-inline) {
   margin-left: auto;
   margin-right: auto;
+}
+
+/* One-tailed vs. two-tailed radio buttons */
+#tail {
+  width: 95%;
 }
 
 /* Overall app title */
@@ -70,3 +82,5 @@ h3 {
   border: none;
   height: 30px;
 }
+
+

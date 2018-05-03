@@ -23,7 +23,7 @@ library(ggiraph)   # For interactive / tooltips
 Row
 -----------------------------
 
-### Baseline Conversion Rate and Estimated Lift %
+### 1. Baseline Conversion Rate and Estimated Lift %
 
 Enter the **baseline conversion rate** for the page, experience, and audience you hope to impact (e.g., enter "5" for "5%"):
 
@@ -59,7 +59,7 @@ output$liftmessage <- renderUI({
 
 _`r htmlOutput("liftmessage", inline = TRUE)`_
 
-### Traffic Volume and # of Variations
+### 2. Traffic Volume and # of Variations
 
 How many visit(or)s do you get to the experience, on average, **over the course of 30 days**?
 
@@ -87,48 +87,51 @@ numericInput("variations",
 Row {.tabset} 
 -----------------------------
 
-### 1. Select 1-Tailed vs. 2-Tailed
+### 3. Select 1-Tailed vs. 2-Tailed
 
-Select whether you want the test to be **one-tailed** or **two-tailed**. _Note: results within your testing tool may vary if you select one-tailed and your testing tool uses two-tailed and vice versa._ 
+Are you specifically looking for a difference that is only in _one_ direction (e.g., a conversion rate that goes _up_), or are you simply interested in whether there is _any_ difference between the variations (up _or_ down)?
 
 ```{r}
 # One-tailed or two-tailed
 radioButtons("tail", label = NA,
-             choices = list("One-tailed" = "one.sided", 
-                            "Two-tailed" = "two.sided"), 
+             choices = list("I'm looking for a difference in one direction (a one-tailed test)" = "one.sided", 
+                            "I'm looking for a any difference -- regardless of whether it's up or down (a two-tailed test)" = "two.sided"), 
              selected = "one.sided")
 ```
 
-**Tip**: If you are specifically looking for a difference that is only in _one_ direction (e.g., a conversion rate that goes _up_), select **One-tailed**. If you are simply interested in whether there is _any_ difference (up _or_ down), select **Two-tailed**.
+_Note: Results within your testing tool may vary if you select one-tailed and your testing tool uses two-tailed and vice versa._ 
 
 **Reference:** [Differences Between a One-Tailed and a Two-Tailed Test](https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faq-what-are-the-differences-between-one-tailed-and-two-tailed-tests/)
 
-### 2. Select Confidence ($1 - \alpha$)
+### 4. Select Confidence ($1 - \alpha$)
 
-Set the **statistical confidence**. The higher you set the statistical confidence, the _less likely_ the statistical results will return a _false difference_ (aka, a false positive or a Type I error).
+How important is it that you do not _**erroneously report a difference**_ when, in reality, the variations are the same?
 
 ```{r}
 # Confidence
 sliderInput(inputId = "confidence",
             label = div(style='width:300px;',
-                        div(style='float:left;', 'MORE Likely'),
-                        div(style='float:right;', 'LESS Likely')),
+                        div(style='float:left;', 'Not Important'),
+                        div(style='float:right;', 'Very Important')),
             min = 50, max = 99, value = 95, width = '300px', post = "%")
 ```
 
-### 3. Select Power ($1 - \beta$)
+This is the **statistical confidence**. The higher you set the statistical confidence, the _less likely_ the statistical results will return a _false difference_ (aka, a false positive or a Type I error).
 
-Set the **statistical power**. The _higher_ you set the statistical power, the _less likely_ the statistical results will return a _false "no difference"_ (aka, a false negative or a Type II error).
+### 5. Select Power ($1 - \beta$)
+
+How important is it that you do not _**erroneously report NO difference**_ when, in reality, there *is* a difference between the variations?
 
 ```{r}
 # Statistical Power
 sliderInput(inputId = "power",
             label = div(style='width:300px;',
-                        div(style='float:left;', 'MORE Likely'),
-                        div(style='float:right;', 'LESS Likely')),
+                        div(style='float:left;', 'Not Important'),
+                        div(style='float:right;', 'Very Important')),
             min = 50, max = 99, value = 80, width = "300px", post = "%")
 ```
 
+This is the **statistical power**. The _higher_ you set the statistical power, the _less likely_ the statistical results will return a _false "no difference"_ (aka, a false negative or a Type II error).
 
 Row
 -----------------------------
@@ -149,7 +152,7 @@ em("This is the number of visitors required to detect a change in the conversion
 ### Selected Test Type, Confidence, and Power
 
 ```{r selections}
-h3("Test Type:", strong(textOutput("tail1", inline = TRUE),"%"))
+h3("Test Type:", strong(textOutput("tail1", inline = TRUE)))
 h3("Confidence:", strong(textOutput("confidence", inline = TRUE),"%"))
 h3("Power:", strong(textOutput("power", inline = TRUE),"%"))
 ```
@@ -229,24 +232,40 @@ output$mineffect_time <- renderPlot({
   req(input$variations >= 2)
 
   # Function to calculate the minimum effect. This is, really, calculating
-  # "p2" -- the second probabiliy -- given the other various inputs.
+  # "p2" -- the second probabiliy -- given the other various inputs. The wrinkle
+  # is that power.prop.test, if only given p1, assumes p2 is *higher*. So, in
+  # cases where the entered MDE is negative, we want to use "p2" for p1. This
+  # only matters for one-tailed tests, actually, but there's no harm in it
+  # being the case for two-tailed.
   calc_min_effect <- function(days_running){
 
     # Calculate the number of observations per group.
-    n = round(days_running * input$avg_traffic / 30 / input$variations,0)
+    n <-  round(days_running * input$avg_traffic / 30 / input$variations,0)
     
-    # Run the test to get the results
+    # Set p1 as the baseline if the MDE entered is positive, and as the
+    # baseline minus the minimum effect if the MDE is negative
+    p1 <- ifelse(input$min_effect > 0,
+                 input$baseline/100,
+                 input$baseline/100 * (1 + input$min_effect/100))
+    
+    # Run the test to get the results.
     calc_results <- power.prop.test(n = n,
-                                    p1 = input$baseline/100,
+                                    p1 = p1,
                                     sig.level = (100 - input$confidence)/100,
                                     power = input$power/100,
                                     alternative = input$tail)
     
     # Create a data frame that has the # of days run, the minimal positive lift
-    # detectable, and the negative minimal effect detectable.
+    # detectable, and the negative minimal effect detectable. "positive" is a bit
+    # of a misnomer: if the MDE entered is negative, then this is actually a 
+    # negative number
     result <- data.frame(days = days_running,
-                         lift_pos = calc_results$p2/calc_results$p1 - 1) %>%
-      mutate(lift_neg = -1*lift_pos)
+                         lift_pos = ifelse(input$min_effect > 0, 
+                                           calc_results$p2/calc_results$p1 - 1,
+                                           (calc_results$p2/calc_results$p1 - 1) * -1)) %>%
+      # If one-tailed, set the base to be zero; otherwise, set it to be the
+      # negative of lift_pos.
+      mutate(lift_neg = ifelse(input$tail == "one.sided", 0, -1*lift_pos))
   }
 
   # Create a data frame with "days" of 1 to 30 and then the minimal
@@ -256,9 +275,11 @@ output$mineffect_time <- renderPlot({
   # Hold on to your socks. We're going to find the first day that is *above*
   # the minimum effect. This will tell us how many days we can expect to need
   # to run the test to detect the minimal lift desired.
-  days_needed <- ifelse(input$min_effect < 0,
-                        which.min(abs(min_by_day$lift_neg-input$min_effect/100)) + 1,
-                        which.min(abs(min_by_day$lift_pos-input$min_effect/100)) + 1)
+  days_needed <- which.min(ifelse(
+    (input$min_effect > 0 & min_by_day$lift_pos > input$min_effect/100) |
+      (input$min_effect < 0 & min_by_day$lift_pos < input$min_effect/100),
+    NA,
+    abs(min_by_day$lift_pos-input$min_effect/100)))
   
   # If the days is less than 25, we want to put the text on the left
   # side of the line. Otherwise, we want it on the right side.
@@ -284,6 +305,24 @@ output$mineffect_time <- renderPlot({
     days_text_val = paste0(days_needed, " Days")
   }
   
+  # And, more fun. Make a data frame that has all of the "minimum effect"
+  # stuff. That will be a one-row data frame for a one-tailed test and
+  # a two-row data frame for a two-tailed test.
+  if(input$tail == "one.sided"){
+    min_effect_df <- data.frame(yintercept = input$min_effect/100,
+                                label = paste0(input$min_effect, "%"))
+  } else {
+    min_effect_df <- data.frame(yintercept = c(input$min_effect/100, -1*input$min_effect/100),
+                                label = c(paste0(input$min_effect, "%"), 
+                                          paste0(-1*input$min_effect, "%")))
+  }
+  
+  # Finally, we're going to need to nudge the labels for the MDE line(s).
+  # The degree to nudge them changes whether the MDE is positive or negative
+  nudge_y <- ifelse(input$min_effect > 0,
+                    min_by_day$lift_pos[20] - min_by_day$lift_pos[30],
+                    min_by_day$lift_pos[30] - min_by_day$lift_pos[20])
+  
   # Plot it!
   ggplot(data = min_by_day) +
     
@@ -295,16 +334,18 @@ output$mineffect_time <- renderPlot({
     geom_hline(aes(yintercept = 0), colour = "gray10") +
     geom_vline(aes(xintercept = 0)) +
 
-    # Draw the minimum effect line
-    geom_hline(aes(yintercept = input$min_effect/100), colour = "#416fba",
+    # Draw the minimum effect line(s)
+    geom_hline(data = min_effect_df,
+               mapping = aes(yintercept = yintercept), colour = "#416fba",
                size = 1, linetype = "dashed") +
-    
-    # Add a text label to the minimum effect ine
-    geom_text(data = data.frame(dummy = NA),
-              mapping = aes(x = 30, y = input$min_effect/100,
-                            label = paste0(input$min_effect, "%")),
+
+        
+    # Add a text label to the minimum effect line(s)
+    geom_text(data = min_effect_df,
+              mapping = aes(x = 30, y = yintercept,
+                            label = label),
               vjust = 0, hjust = 1, fontface = "bold", colour = "#416fba",
-              nudge_y = min_by_day$lift_pos[20] - min_by_day$lift_pos[30],
+              nudge_y = nudge_y,
               size = 4.5) +
     
     # Draw the "days needed" line and text
@@ -316,8 +357,9 @@ output$mineffect_time <- renderPlot({
               hjust = days_text_hjust, fontface = "bold", colour = "#416fba",
               nudge_x = days_text_nudge, size = 4.5) +
     
-    # Draw the intersection point
-    geom_point(aes(x = days_needed, y = input$min_effect/100), 
+    # Draw the intersection point(s)
+    geom_point(data = min_effect_df,
+               aes(x = days_needed, y = yintercept), 
                size = 2 * days_size,
                colour = "gray30") +
     
@@ -357,7 +399,7 @@ output$error_matrix <- renderggiraph({
   # We *could* display this even without data, but we're going to blank it
   # out until values are entered.
   req(input$baseline > 0)
-  req(input$min_effect > 0)
+  req(input$min_effect > 0 | input$min_effect < 0)
   req(input$avg_traffic > 0)
   req(input$variations >= 2)
   
@@ -368,9 +410,11 @@ output$error_matrix <- renderggiraph({
   # out which quadrant (facet) for which the value is used. The "(100*x)^0.5"
   # is because we're using areas to represent percentages. So, we've got to
   # do some square rooting.
-  error_df <- data.frame(reality = factor(c("DIFFERENCE", "NO DIFFERENCE", "DIFFERENCE", "NO DIFFERENCE"),
+  error_df <- data.frame(reality = factor(c("DIFFERENCE", "NO DIFFERENCE", 
+                                            "DIFFERENCE", "NO DIFFERENCE"),
                                           levels = c("DIFFERENCE", "NO DIFFERENCE")),
-                         result = factor(c("DIFFERENCE", "DIFFERENCE", "NO DIFFERENCE", "NO DIFFERENCE"),
+                         result = factor(c("DIFFERENCE", "DIFFERENCE", 
+                                           "NO DIFFERENCE", "NO DIFFERENCE"),
                                          levels = c("DIFFERENCE", "NO DIFFERENCE")),
                          label = c(paste0("True Difference\n", input$power, "%"), 
                                    paste0("False Difference\n", 100 - input$confidence, "%"),
