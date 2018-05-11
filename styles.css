@@ -22,8 +22,8 @@ text {
 
 /* Tabsets try to resize to be wayyyy to tall. So, overwrite that. */
 #section-row-1 {
-    height: 230px;
-    flex: 0 0 230px !important;
+    height: 250px;
+    flex: 0 0 250px !important;
 }
 
 /* Main results output */
@@ -55,7 +55,15 @@ h3 {
   font-size: 16px;
   font-weight: bold;
   color: #444;
+  border-color: #cccccc;
 }
+
+/* Make the tabset tabs look more visibly like tabs */
+#section-row-1 > ul > li:not(.active) > a {
+  background-color: #eeeeee;
+}
+
+
 
 /* Center the numeric sliders */
 .shiny-input-container:not(.shiny-input-container-inline) {

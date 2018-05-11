@@ -131,7 +131,7 @@ sliderInput(inputId = "power",
             min = 50, max = 99, value = 80, width = "300px", post = "%")
 ```
 
-This is the **statistical power**. The _higher_ you set the statistical power, the _less likely_ the statistical results will return a _false "no difference"_ (aka, a false negative or a Type II error).
+The _higher_ you set the statistical power, the greater your likelihood of detecting a real difference if one exists and the less likely you will return a false “no difference” (aka, a false negative or a Type II error).`r tags$span(style="color:red; font-style:italic;", textOutput("power_msg", inline = TRUE))`
 
 Row
 -----------------------------
@@ -181,6 +181,12 @@ output$p2_value1 <- renderText(paste0(input$baseline * (1 + input$min_effect/100
 output$tail <- renderText(ifelse(input$tail == "one.sided", "one-tailed", "two-tailed"))
 output$tail1 <- renderText(ifelse(input$tail == "one.sided", "One-tailed", "Two-tailed"))
 
+# Create a warning message if Power is set below 80%
+output$power_msg <- renderText(ifelse(input$power < 80,
+                                    paste0("CAUTION: We recommend a minimum 80%. Statistical ",
+                                           "power is the likelihood that you will be able to ",
+                                           "detect an effect when an effect exists."),
+                                    ""))
 # Calculate the sample size
 output$sample_size <- renderText({
   
@@ -513,4 +519,4 @@ output$error_matrix <- renderggiraph({
 Row
 -----------------------------
 
-_This calculator is built with R using the `power.prop.test()` function (for the actual calculations), which performs a two-sample test for proportions. Read more in the [documentation for the function](https://www.rdocumentation.org/packages/stats/versions/3.4.3/topics/power.prop.test). The source code for the calculator itself is availabe [on Github](https://github.com/SDITools/sample-size-calculator)._
+_This calculator is built with R using the `power.prop.test()` function (for the actual calculations), which performs a two-sample test for proportions. Read more in the [documentation for the function](https://www.rdocumentation.org/packages/stats/versions/3.4.3/topics/power.prop.test)._
