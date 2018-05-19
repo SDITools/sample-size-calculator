@@ -162,11 +162,6 @@ The **number of visit(or)s per variation** should be at least:
 ```{r output}
 h1(textOutput("sample_size"))
 
-# em("This is the number of visitors required to detect a change in the conversion rate from ",
-#    strong(textOutput("baseline", inline = TRUE)), "to at least",
-#    strong(textOutput("p2_value", inline = TRUE)), "in a",
-#    textOutput("tail", inline = TRUE), "test.")
-
 em(htmlOutput("range_message", inline = TRUE))
 
 ```
@@ -174,7 +169,7 @@ em(htmlOutput("range_message", inline = TRUE))
 ### Selected Test Type, Confidence, and Power
 
 ```{r selections}
-h3("Test Type:", strong(textOutput("tail1", inline = TRUE)))
+h3("Test Type:", strong(textOutput("tail", inline = TRUE)))
 h3("Confidence:", strong(textOutput("confidence", inline = TRUE),"%"))
 h3("Power:", strong(textOutput("power", inline = TRUE),"%"))
 ```
@@ -199,10 +194,7 @@ output$baseline2 <- renderText({
 # Back to simpleer ones
 output$power <- renderText(input$power)
 output$confidence <- renderText(input$confidence)
-output$p2_value <- renderText(paste0(input$baseline * (1 + input$min_effect/100), "%"))
-output$p2_value1 <- renderText(paste0(input$baseline * (1 + input$min_effect/100), "%"))
-output$tail <- renderText(ifelse(input$tail == "one.sided", "one-tailed", "two-tailed"))
-output$tail1 <- renderText(ifelse(input$tail == "one.sided", "One-tailed", "Two-tailed"))
+output$tail <- renderText(ifelse(input$tail == "one.sided", "One-tailed", "Two-tailed"))
 
 # Create a warning message if Power is set below 80%
 output$power_msg <- renderText(ifelse(input$power < 80,
@@ -237,7 +229,7 @@ output$range_message <- renderUI({
                        "</strong>.")
     } else {
       message = paste0("This is the number of visitors required to detect a change in the ",
-                       "from <strong>", baseline, "</strong> to <strong>", p2_val_1,
+                       "conversion rate from <strong>", baseline, "</strong> to <strong>", p2_val_1,
                        "</strong> OR from <strong>", baseline, "</strong> to <strong>",
                        p2_val_2, "</strong> (in a two-tailed test).")
     }
@@ -246,19 +238,6 @@ output$range_message <- renderUI({
   # Return the message.
   HTML(message)
 })
-
-
-# 
-# if(textOutput("tail") == "one-tailed"){
-#   em("This is the number of visitors required to detect a change in the conversion rate from ",
-#    strong(textOutput("baseline", inline = TRUE)), "to at least",
-#    strong(textOutput("p2_value", inline = TRUE)), "in a",
-#    textOutput("tail", inline = TRUE), "test.")
-# } else {
-#   em("This is a two-tailed test.")
-# }
-# from 15% to at least 16.5% in a one-tailed test.
-
 
 # Calculate the sample size
 output$sample_size <- renderText({
