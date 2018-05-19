@@ -29,30 +29,49 @@ Enter the **baseline conversion rate** for the page, experience, and audience yo
 
 ```{r}
 # Baseline conversion rate
-numericInput("baseline", 
-             label = NA, value = NA,
-             width = "100px")
+div(style="text-align: center;",
+    div(style="display:inline-block;", numericInput("baseline", label = NULL, value = NA, width = "100px")),
+    div(style="display:inline-block; padding-left: 5px; font-weight: bold", "%"))
 ```
 
 Enter the **estimated lift percentage** you would need to see in order to make a decision (positive or negative):
 
 ```{r}
 # Minimal detectable effect
-numericInput("min_effect", 
-             label = NA, value = NA, width = "100px")
+div(style="text-align: center;",
+    div(style="display:inline-block;", numericInput("min_effect", label = NULL, value = NA, width = "100px")),
+    div(style="display:inline-block; padding-left: 5px; font-weight: bold", "%"))
 ```
 
 ```{r liftmessage}
 # We're starting with no values for the baseline and MDE, so we want to clearly prompt
 # the user to enter those and, once entered, reiterate the interpretation of those values.
+# And, to wrinkle things up a bit more, we need to calculate the MDE in both directions
+# if the user selects a two-tailed test.
 output$liftmessage <- renderUI({
   if(is.na(input$baseline) | input$baseline == 0 |
      is.na(input$min_effect) | input$min_effect == 0){
-    message <- HTML("<div style=\"color:red;\">Enter a baseline conversion rate and an estimated lift % above.</font>")
+    message <- HTML("<div style=\"color:red;\">Enter a baseline conversion rate and an estimated lift % above.</div>")
   } else {
-    message <- HTML(paste0("This means you're looking to detect a change in the conversion rate from ",
-                      strong(paste0(input$baseline,"%")), " to at least ",
-                      strong(paste0(input$baseline * (1 + input$min_effect/100),"%")),"."))
+    
+    # Calculate the different values. We'll go ahead and calculate the second p2,
+    # which is only needed if it's a two-tailed test. But, the if() statement will
+    # decide whether to use that or not.
+    baseline <- paste0(input$baseline,"%")
+    p2_val_1 <- paste0(input$baseline * (1 + input$min_effect/100), "%")
+    p2_val_2 <- paste0(input$baseline * (1 - input$min_effect/100), "%")
+    
+    # Build the actual string
+    if(input$tail == "one.sided"){
+      message = HTML("<div style=\"font-style: italic;\">This means you're looking to detect a change in the ",
+                       "conversion rate from <strong>", baseline, "</strong> to <strong>", 
+                       p2_val_1, "</strong>.</div>")
+    } else {
+      message = HTML("<div style=\"font-style: italic;\">This means you're looking to detect a change in the ",
+                       "conversion rate from <strong>", baseline, "</strong> to <strong>", 
+                       p2_val_1, "</strong> OR from <strong>", baseline, "</strong> to <strong>",
+                       p2_val_2, "</strong> (as a two-tailed test).</div>")
+    }
   }
 })
 ```
@@ -66,7 +85,7 @@ How many visit(or)s do you get to the experience, on average, **over the course 
 ```{r}
 # 30-day visit(or)s
 numericInput("avg_traffic", 
-             label = NA, value = NA,
+             label = NULL, value = NA,
              width = "150px")
 ```
 
@@ -75,7 +94,7 @@ How many total variations are you testing, including the control (e.g., a standa
 ```{r}
 # of variations
 numericInput("variations",
-             label = NA, value = 2,
+             label = NULL, value = 2,
              width = "100px")
 
 # Given the baseline conversion rate entered above`r textOutput("baseline2", inline=TRUE)`, the chart at right shows the minimum lift you can expect to detect based on how long you run the test. You need to be **outside** the gray shaded area to reach statistical significance with the given power & confidence selections below.
@@ -143,10 +162,12 @@ The **number of visit(or)s per variation** should be at least:
 ```{r output}
 h1(textOutput("sample_size"))
 
-em("This is the number of visitors required to detect a change in the conversion rate from ",
-   strong(textOutput("baseline", inline = TRUE)), "to at least",
-   strong(textOutput("p2_value", inline = TRUE)), "in a",
-   textOutput("tail", inline = TRUE), "test.")
+# em("This is the number of visitors required to detect a change in the conversion rate from ",
+#    strong(textOutput("baseline", inline = TRUE)), "to at least",
+#    strong(textOutput("p2_value", inline = TRUE)), "in a",
+#    textOutput("tail", inline = TRUE), "test.")
+
+em(htmlOutput("range_message", inline = TRUE))
 
 ```
 
@@ -174,6 +195,8 @@ output$baseline2 <- renderText({
       output_value <- paste0(" (",input$baseline,"%)")
     }
   })
+
+# Back to simpleer ones
 output$power <- renderText(input$power)
 output$confidence <- renderText(input$confidence)
 output$p2_value <- renderText(paste0(input$baseline * (1 + input$min_effect/100), "%"))
@@ -187,6 +210,56 @@ output$power_msg <- renderText(ifelse(input$power < 80,
                                            "power is the likelihood that you will be able to ",
                                            "detect an effect when an effect exists."),
                                     ""))
+
+# Create the couple of messages that make it clear as to what ranges are being tested.
+# If it's one-tailed, it's just in one direction. If it's two-tailed, then it's in two (duh).
+# This is fairly repetitive with code earlier, but the message is slightly different, and
+# I couldn't figure out a clean way to re-use thes ame setup.
+output$range_message <- renderUI({
+  
+  # If a baseline and MDE aren't entered yet, then return a prompt as such
+  if(is.na(input$baseline) | input$baseline == 0 |
+     is.na(input$min_effect) | input$min_effect == 0){
+    message <- HTML("<div style=\"color:red;\">Enter a baseline conversion rate and an estimated lift % above.</font>")
+  } else {
+    
+    # Calculate the different values. We'll go ahead and calculate the second p2,
+    # which is only needed if it's a two-tailed test. But, the if() statement will
+    # decide whether to use that or not.
+    baseline <- paste0(input$baseline,"%")
+    p2_val_1 <- paste0(input$baseline * (1 + input$min_effect/100), "%")
+    p2_val_2 <- paste0(input$baseline * (1 - input$min_effect/100), "%")
+    
+    # Build the actual string
+    if(input$tail == "one.sided"){
+      message = paste0("This is the number of visitors required to detect a change in the ",
+                       "conversion rate from <strong>", baseline, "</strong> to <strong>", p2_val_1,
+                       "</strong>.")
+    } else {
+      message = paste0("This is the number of visitors required to detect a change in the ",
+                       "from <strong>", baseline, "</strong> to <strong>", p2_val_1,
+                       "</strong> OR from <strong>", baseline, "</strong> to <strong>",
+                       p2_val_2, "</strong> (in a two-tailed test).")
+    }
+  }
+  
+  # Return the message.
+  HTML(message)
+})
+
+
+# 
+# if(textOutput("tail") == "one-tailed"){
+#   em("This is the number of visitors required to detect a change in the conversion rate from ",
+#    strong(textOutput("baseline", inline = TRUE)), "to at least",
+#    strong(textOutput("p2_value", inline = TRUE)), "in a",
+#    textOutput("tail", inline = TRUE), "test.")
+# } else {
+#   em("This is a two-tailed test.")
+# }
+# from 15% to at least 16.5% in a one-tailed test.
+
+
 # Calculate the sample size
 output$sample_size <- renderText({
   
@@ -235,6 +308,7 @@ plotOutput("mineffect_time")
 # Calculate the values and build the chart
 output$mineffect_time <- renderPlot({
   
+  req(input$baseline > 0)
   req(input$avg_traffic > 0)
   req(input$variations >= 2)
   req(input$avg_traffic >= 300)   # This would be 10 visit(ors) a day.
