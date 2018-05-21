@@ -8,7 +8,7 @@ output:
 runtime: shiny
 ---
 
-Enter values below to calculate the number of visitors needed for each variation in an A/B test to reliably detect the desired conversion rate lift.
+Enter values below to calculate the *minimum effect required* in an A/B test to reliably detect a difference in a desired runtime.
 
 ```{r setup}
 library(ggplot2)
@@ -39,7 +39,7 @@ Enter the **desired test duration** you would need to see in order to make a dec
 ```{r}
 # Desired runtime
 div(style="text-align: center;",
-    div(style="display:inline-block;", numericInput("runtime", label = NULL, value = NA, width = "100px")),
+    div(style="display:inline-block;", numericInput("runtime", label = NULL, value = NA, width = "80px")),
     div(style="display:inline-block; padding-left: 5px; font-weight: bold", "days"))
 ```
 
@@ -186,42 +186,77 @@ output$power_msg <- renderText(ifelse(input$power < 80,
                                            "detect an effect when an effect exists."),
                                     ""))
 
+# Reactive expression to calculate the min effect. We're going to use this
+# both to output the MDE, as well as to calculate the message that explains
+# how to interpet that
+min_effect_calc <- reactive({
+  
+  # Do some checks to cover the corner cases with different messaging
+  if(input$power == 50 & input$confidence == 50){
+    results <- -1000
+  } else {
+    results <- tryCatch(
+      {calc_p2 <- power.prop.test(n = floor((input$runtime * (input$avg_traffic/30)) / input$variations),
+                                  p1 = input$baseline/100,
+                                  sig.level = (100 - input$confidence)/100,
+                                  power = input$power/100,
+                                  alternative = input$tail)
+      calc_p2 <- calc_p2$p2/(input$baseline/100) - 1
+      },
+      error = function(e){
+        return(-999)
+      }
+    )
+    
+    # One more check to see if things landed such that we still rounded to 0
+    if(results == 0){
+      results <- -1000
+    }
+  }
+  
+  return(results)
+})
+
+
 # Create the couple of messages that make it clear as to what ranges are being tested.
 # If it's one-tailed, it's just in one direction. If it's two-tailed, then it's in two (duh).
-# This is fairly repetitive with code earlier, but the message is slightly different, and
-# I couldn't figure out a clean way to re-use thes ame setup.
 output$range_message <- renderUI({
   
-  # If a baseline and MDE aren't entered yet, then return a prompt as such
+  min_effect <- min_effect_calc()
+  
+  # If a baseline and runtime aren't entered yet, then return a prompt as such
   if(is.na(input$baseline) | input$baseline == 0 |
      is.na(input$runtime) | input$runtime == 0){
-    message <- HTML("<div style=\"color:red;\">Enter a baseline conversion rate and an estimated lift % above.</font>")
+    message <- HTML("<div style=\"color:red;\">Enter a baseline conversion rate and a desired runtime above.</font>")
   } else {
     
     # Calculate the different values. We'll go ahead and calculate the second p2,
     # which is only needed if it's a two-tailed test. But, the if() statement will
     # decide whether to use that or not.
     baseline <- paste0(input$baseline,"%")
-    p2_val_1 <- paste0(input$baseline * (1 + input$min_effect/100), "%")
-    p2_val_2 <- paste0(input$baseline * (1 - input$min_effect/100), "%")
+    p2_val_1 <- paste0(round(input$baseline * (1 + min_effect), digits = 2), "%")
+    p2_val_2 <- paste0(round(input$baseline * (1 - min_effect), digits = 2), "%")
     
     # Build the actual string
-    if(input$tail == "one.sided"){
-      message = paste0("This is the number of visitors required to detect a change in the ",
-                       "conversion rate from <strong>", baseline, "</strong> to <strong>", p2_val_1,
-                       "</strong>.")
+    if(min_effect == -999 | min_effect == -1000){
+      message = ""
     } else {
-      message = paste0("This is the number of visitors required to detect a change in the conversion rate ",
-                       "from <strong>", baseline, "</strong> to <strong>", p2_val_1,
-                       "</strong> OR from <strong>", baseline, "</strong> to <strong>",
-                       p2_val_2, "</strong> (in a two-tailed test).")
+      if(input$tail == "one.sided"){
+        message = paste0("The selected runtime (", input$runtime, " days) requires a change in the ",
+                         "conversion rate from <strong>", baseline, "</strong> to at least <strong>", p2_val_1,
+                         "</strong> to be a detected difference.")
+      } else {
+        message = paste0("The selected runtime (", input$runtime, " days) requires a change in the ",
+                         "conversion rate from <strong>", baseline, "</strong> to at least <strong>", p2_val_1,
+                         "</strong> OR from <strong>", baseline, "</strong> to at least <strong>",
+                         p2_val_2, "</strong> (in a two-tailed test) to be a detected difference.")
+      }
     }
   }
   
   # Return the message.
   HTML(message)
 })
-
 
 # Calculate the MDE
 output$min_effect <- renderText({
@@ -230,30 +265,19 @@ output$min_effect <- renderText({
   # just flip a coin
   coin_flip_message <- "0 (Just Flip a Coin!)"
   
+  min_effect <- min_effect_calc()
+  
   # Do some checks to cover the corner cases with different messaging
-  if(input$power == 50 & input$confidence == 50){
+  if(min_effect == -1000){
     results <- coin_flip_message
   } else {
-    results <- tryCatch(
-      {calc_p2 <- power.prop.test(n = floor((input$runtime * (input$avg_traffic/30)) / input$variations),
-                                 p1 = input$baseline/100,
-                                 sig.level = (100 - input$confidence)/100,
-                                 power = input$power/100,
-                                 alternative = input$tail)
-      calc_p2 <- paste0(round((calc_p2$p2/(input$baseline/100) - 1) * 100,
-                              digits = 1), "%")
-      },
-      error = function(e){
-        return("N/A")
-      }
-    )
-    
-    # One more check to see if things landed such that we still rounded to 0
-    if(results == 0){
-      results <- coin_flip_message
+    if(min_effect == -999){
+      results <- "N/A"
+    } else {
+      results <- paste0(round(min_effect * 100, digits = 1), "%")
     }
   }
-  
+
   # Return the results
   results
 })
@@ -273,16 +297,14 @@ plotOutput("mineffect_time")
 output$mineffect_time <- renderPlot({
   
   req(input$baseline > 0)
+  req(input$runtime > 0)
   req(input$avg_traffic > 0)
   req(input$variations >= 2)
   req(input$avg_traffic >= 300)   # This would be 10 visit(ors) a day.
 
   # Function to calculate the minimum effect. This is, really, calculating
-  # "p2" -- the second probabiliy -- given the other various inputs. The wrinkle
-  # is that power.prop.test, if only given p1, assumes p2 is *higher*. So, in
-  # cases where the entered MDE is negative, we want to use "p2" for p1. This
-  # only matters for one-tailed tests, actually, but there's no harm in it
-  # being the case for two-tailed.
+  # "p2" -- the second probabiliy -- given the other various inputs. We use
+  # this to build the full curve for the plot.
   calc_min_effect <- function(days_running){
 
     # Calculate the number of observations per group.
@@ -290,9 +312,9 @@ output$mineffect_time <- renderPlot({
     
     # Set p1 as the baseline if the MDE entered is positive, and as the
     # baseline minus the minimum effect if the MDE is negative
-    p1 <- ifelse(input$min_effect > 0,
+    p1 <- ifelse(min_effect_calc() > 0,
                  input$baseline/100,
-                 input$baseline/100 * (1 + input$min_effect/100))
+                 input$baseline/100 * (1 + min_effect_calc()))
     
     # Run the test to get the results.
     calc_results <- power.prop.test(n = n,
@@ -306,7 +328,7 @@ output$mineffect_time <- renderPlot({
     # of a misnomer: if the MDE entered is negative, then this is actually a 
     # negative number
     result <- data.frame(days = days_running,
-                         lift_pos = ifelse(input$min_effect > 0, 
+                         lift_pos = ifelse(min_effect_calc() > 0, 
                                            calc_results$p2/calc_results$p1 - 1,
                                            (calc_results$p2/calc_results$p1 - 1) * -1)) %>%
       # If one-tailed, set the base to be zero; otherwise, set it to be the
@@ -322,10 +344,10 @@ output$mineffect_time <- renderPlot({
   # the minimum effect. This will tell us how many days we can expect to need
   # to run the test to detect the minimal lift desired.
   days_needed <- which.min(ifelse(
-    (input$min_effect > 0 & min_by_day$lift_pos > input$min_effect/100) |
-      (input$min_effect < 0 & min_by_day$lift_pos < input$min_effect/100),
+    (min_effect_calc() > 0 & min_by_day$lift_pos > min_effect_calc()) |
+      (min_effect_calc() < 0 & min_by_day$lift_pos < min_effect_calc()),
     NA,
-    abs(min_by_day$lift_pos-input$min_effect/100)))
+    abs(min_by_day$lift_pos-min_effect_calc())))
   
   # If the minimum effect can't be hit in 30 days, we don't want to show a
   # line, and we want a message to that effect. So, set a few values to be
@@ -356,10 +378,10 @@ output$mineffect_time <- renderPlot({
   # stuff. That will be a one-row data frame for a one-tailed test and
   # a two-row data frame for a two-tailed test.
   if(input$tail == "one.sided"){
-    min_effect_df <- data.frame(yintercept = input$min_effect/100,
+    min_effect_df <- data.frame(yintercept = min_effect_calc(),
                                 label = paste0(input$min_effect, "%"))
   } else {
-    min_effect_df <- data.frame(yintercept = c(input$min_effect/100, -1*input$min_effect/100),
+    min_effect_df <- data.frame(yintercept = c(min_effect_calc(), -1*min_effect_calc()),
                                 label = c(paste0(input$min_effect, "%"), 
                                           paste0(-1*input$min_effect, "%")))
   }
@@ -446,7 +468,7 @@ output$error_matrix <- renderggiraph({
   # We *could* display this even without data, but we're going to blank it
   # out until values are entered.
   req(input$baseline > 0)
-  req(input$min_effect > 0 | input$min_effect < 0)
+  req(input$runtime > 0)
   req(input$avg_traffic > 0)
   req(input$variations >= 2)
   
