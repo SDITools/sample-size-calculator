@@ -5,6 +5,8 @@ output:
     orientation: rows
     css: styles.css
     vertical_layout: scroll
+    includes:
+      after_body: tracking.html
 runtime: shiny
 ---
 
