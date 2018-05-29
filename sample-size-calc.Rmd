@@ -166,6 +166,9 @@ h1(textOutput("sample_size"))
 
 em(htmlOutput("range_message", inline = TRUE))
 
+# Output a hidden field with the test duration so that a tag manager can
+# grab the value and push it into analytics
+tags$span(style="visibility:hidden", textOutput("duration"))
 ```
 
 ### Selected Test Type, Confidence, and Power
@@ -344,12 +347,24 @@ output$mineffect_time <- renderPlot({
     NA,
     abs(min_by_day$lift_pos-input$min_effect/100)))
   
+  # Set the days needed as an output. We'll drop this into an hidden
+  # field so that a tag manager can grab it and push it into analytics.
+  output$duration <- renderText({
+    if(length(days_needed) == 0){
+      duration_message <- "Over 30 Days"
+    } else {
+      duration_message <-  as.character(days_needed)
+    }
+    duration_message
+    })
+  
   # If the minimum effect can't be hit in 30 days, we don't want to show a
   # line, and we want a message to that effect. So, set a few values to be
   # used in the relevant geoms to make the line disappear (size = 0) and to
   # set the text description.
   if(length(days_needed) == 0){
-    days_needed <-  15    # Set the message in the center
+    duration_msg <-  "Over 30 Days"    # Set the message in the center
+    days_needed_x_intercept <- 15                   # Set the message in the center
     days_text_hjust <-  0.5
     days_size <-  0
     days_text_val <-  "The test would take\nmore than 30 days."
@@ -357,6 +372,7 @@ output$mineffect_time <- renderPlot({
   } else {
     days_size = 1
     days_text_val = paste0(days_needed, " Days")
+    days_needed_x_intercept <- days_needed
     
     # If the days is less than 25, we want to put the text on the left
     # side of the line. Otherwise, we want it on the right side.
@@ -373,10 +389,12 @@ output$mineffect_time <- renderPlot({
   # stuff. That will be a one-row data frame for a one-tailed test and
   # a two-row data frame for a two-tailed test.
   if(input$tail == "one.sided"){
-    min_effect_df <- data.frame(yintercept = input$min_effect/100,
+    min_effect_df <- data.frame(xintercept <- days_needed_x_intercept,
+                                yintercept = input$min_effect/100,
                                 label = paste0(input$min_effect, "%"))
   } else {
-    min_effect_df <- data.frame(yintercept = c(input$min_effect/100, -1*input$min_effect/100),
+    min_effect_df <- data.frame(xintercept <- days_needed_x_intercept,
+                                yintercept = c(input$min_effect/100, -1*input$min_effect/100),
                                 label = c(paste0(input$min_effect, "%"), 
                                           paste0(-1*input$min_effect, "%")))
   }
@@ -413,17 +431,17 @@ output$mineffect_time <- renderPlot({
               size = 4.5) +
 
     # Draw the "days needed" line and text
-    geom_vline(aes(xintercept = days_needed), colour = "#416fba",
+    geom_vline(aes(xintercept = days_needed_x_intercept), colour = "#416fba",
                size = days_size, linetype = "dashed") +
     geom_text(data = data.frame(dummy = NA),
-              mapping = aes(x = days_needed, y = min_by_day$lift_pos[2],
+              mapping = aes(x = days_needed_x_intercept, y = min_by_day$lift_pos[2],
                             label = days_text_val),
               hjust = days_text_hjust, fontface = "bold", colour = "#416fba",
               nudge_x = days_text_nudge, size = 4.5) +
 
     # Draw the intersection point(s)
     geom_point(data = min_effect_df,
-               aes(x = days_needed, y = yintercept),
+               aes(x = xintercept, y = yintercept),
                size = 2 * days_size,
                colour = "gray30") +
     
