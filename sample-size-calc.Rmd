@@ -110,19 +110,19 @@ Row {.tabset}
 
 ### 3. Select 1-Tailed vs. 2-Tailed
 
-Are you specifically looking for a difference that is only in _one_ direction (e.g., a conversion rate that goes _up_), or are you simply interested in whether there is _any_ difference between the variations (up _or_ down)?
+Is your hypothesis _directional_ (e.g., you expect the conversion rate to increase) or non-directional (e.g., you expect the challenger to be different, but you have no evidence to support the challenger as _better_)?
 
 ```{r}
 # One-tailed or two-tailed
 radioButtons("tail", label = NA,
-             choices = list("I'm looking for a difference in one direction (a one-tailed test)" = "one.sided", 
-                            "I'm looking for a any difference -- regardless of whether it's up or down (a two-tailed test)" = "two.sided"), 
+             choices = list("My hypothesis is directional and I want to test if B is BETTER than A (1-tailed)" = "one.sided", 
+                            "My hypothesis is non-directional and I want to test if B is DIFFERENT than A (2-tailed)" = "two.sided"), 
              selected = "one.sided")
 ```
 
 _Note: Results within your testing tool may vary if you select one-tailed and your testing tool uses two-tailed and vice versa._ 
 
-**Reference:** [Differences Between a One-Tailed and a Two-Tailed Test](https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faq-what-are-the-differences-between-one-tailed-and-two-tailed-tests/)
+**Reference:** [Differences Between a One-Tailed and a Two-Tailed Test](https://www.sciencedirect.com/science/article/pii/S0148296312000550)
 
 ### 4. Select Confidence ($1 - \alpha$)
 

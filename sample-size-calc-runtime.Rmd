@@ -10,8 +10,7 @@ output:
 runtime: shiny
 ---
 
-tags$head()
-Enter values below to calculate the *minimum effect required* in an A/B test to reliably detect a difference in a desired runtime.
+Enter values below to calculate the *minimum lift percentage* required in an A/B/n test to reliably detect a statistical difference within an available runtime.
 
 ```{r setup}
 library(ggplot2)
@@ -27,7 +26,7 @@ library(ggiraph)   # For interactive / tooltips
 Row
 -----------------------------
 
-### 1. Baseline Conversion Rate and Desired Runtime
+### 1. Baseline Conversion Rate and Maximum Runtime
 
 Enter the **baseline conversion rate** for the page, experience, and audience you hope to impact (e.g., enter "5" for "5%"):
 
@@ -38,7 +37,7 @@ div(style="text-align: center;",
     div(style="display:inline-block; padding-left: 5px; font-weight: bold", "%"))
 ```
 
-Enter the **desired test duration** you would need to see in order to make a decision:
+Enter the **maximum test duration** available for your experiment:
 
 ```{r}
 # Desired runtime
@@ -55,7 +54,7 @@ div(style="text-align: center;",
 output$liftmessage <- renderUI({
   if(is.na(input$baseline) | input$baseline == 0 |
      is.na(input$runtime) | input$runtime == 0){
-    message <- HTML("<div style=\"color:red;\">Enter a baseline conversion rate and a desired runtime above.</div>")
+    message <- HTML("<div style=\"color:red;\">Enter a baseline conversion rate and a maximum runtime above.</div>")
   } else {
     message <- HTML("")
   }
@@ -95,19 +94,19 @@ Row {.tabset}
 
 ### 3. Select 1-Tailed vs. 2-Tailed
 
-Are you specifically looking for a difference that is only in _one_ direction (e.g., a conversion rate that goes _up_), or are you simply interested in whether there is _any_ difference between the variations (up _or_ down)?
+Is your hypothesis _directional_ (e.g., you expect the conversion rate to increase) or non-directional (e.g., you expect the challenger to be different, but you have no evidence to support the challenger as _better_)?
 
 ```{r}
 # One-tailed or two-tailed
 radioButtons("tail", label = NA,
-             choices = list("I'm looking for a difference in one direction (a one-tailed test)" = "one.sided", 
-                            "I'm looking for a any difference -- regardless of whether it's up or down (a two-tailed test)" = "two.sided"), 
+             choices = list("My hypothesis is directional and I want to test if B is BETTER than A (1-tailed)" = "one.sided", 
+                            "My hypothesis is non-directional and I want to test if B is DIFFERENT than A (2-tailed)" = "two.sided"), 
              selected = "one.sided")
 ```
 
 _Note: Results within your testing tool may vary if you select one-tailed and your testing tool uses two-tailed and vice versa._ 
 
-**Reference:** [Differences Between a One-Tailed and a Two-Tailed Test](https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faq-what-are-the-differences-between-one-tailed-and-two-tailed-tests/)
+**Reference:** [Differences Between a One-Tailed and a Two-Tailed Test](https://www.sciencedirect.com/science/article/pii/S0148296312000550)
 
 ### 4. Select Confidence ($1 - \alpha$)
 
@@ -142,9 +141,9 @@ The _higher_ you set the statistical power, the greater your likelihood of detec
 Row
 -----------------------------
 
-### Minimal Detectable Effect
+### Minimum Lift Percentage
 
-Given the selected runtime for the test, the baseline conversion rate, and the traffic to the experience, the **minimum detectable effect** required for this runtime is:
+Given the available runtime and traffic for the experience, the baseline conversion rate, and number of variants included, the **Minimum Lift Percentage** (aka, minimum detectable effect or MDE) required to achieve statistical significance is: 
 
 ```{r output}
 h1(textOutput("min_effect"))
@@ -231,7 +230,7 @@ output$range_message <- renderUI({
   # If a baseline and runtime aren't entered yet, then return a prompt as such
   if(is.na(input$baseline) | input$baseline == 0 |
      is.na(input$runtime) | input$runtime == 0){
-    message <- HTML("<div style=\"color:red;\">Enter a baseline conversion rate and a desired runtime above.</font>")
+    message <- HTML("<div style=\"color:red;\">Enter a baseline conversion rate and maximum runtime above.</font>")
   } else {
     
     # Calculate the different values. We'll go ahead and calculate the second p2,
@@ -246,18 +245,18 @@ output$range_message <- renderUI({
       message = ""
     } else {
       if(input$tail == "one.sided"){
-        message = paste0("The selected runtime (", input$runtime, " days) requires a change in the ",
+        message = paste0("The available runtime (", input$runtime, " days) requires a change in the ",
                          "conversion rate from <strong>", baseline, "</strong> to at least <strong>", p2_val_1,
-                         "</strong> to be a detected difference.")
+                         "</strong> to be statistically significant.")
       } else {
-        message = paste0("The selected runtime (", input$runtime, " days) requires a change in the ",
+        message = paste0("The available runtime (", input$runtime, " days) requires a change in the ",
                          "conversion rate from <strong>", baseline, "</strong> to at least <strong>", p2_val_1,
                          "</strong> OR from <strong>", baseline, "</strong> to at least <strong>",
-                         p2_val_2, "</strong> (in a two-tailed test) to be a detected difference.")
+                         p2_val_2, "</strong> (in a two-tailed test) to be statistically significant.")
       }
     }
   }
-  
+
   # Return the message.
   HTML(message)
 })
