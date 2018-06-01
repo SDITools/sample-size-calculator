@@ -82,11 +82,6 @@ How many total variations are you testing, including the control (e.g., a standa
 numericInput("variations",
              label = NULL, value = 2,
              width = "100px")
-
-# Given the baseline conversion rate entered above`r textOutput("baseline2", inline=TRUE)`, the chart at right shows the minimum lift you can expect to detect based on how long you run the test. You need to be **outside** the gray shaded area to reach statistical significance with the given power & confidence selections below.
-# 
-# The horizontal line is the **Lift %** entered above. Try adjusting that value to see the impact on the expected runtime.
-
 ```
 
 Row {.tabset} 
@@ -114,11 +109,24 @@ How important is it that you do not _**erroneously report a difference**_ when, 
 
 ```{r}
 # Confidence
-sliderInput(inputId = "confidence",
-            label = div(style='width:300px;',
-                        div(style='float:left;', 'Not Important'),
-                        div(style='float:right;', 'Very Important')),
-            min = 50, max = 99, value = 95, width = '300px', post = "%")
+div(style="display: inline-block; vertical-align:top; width: 350px",
+    sliderInput(inputId = "confidence",
+                label = div(style='width:300px;',
+                            div(style='float:left;', 'Not Important'),
+                            div(style='float:right;', 'Very Important')),
+                min = 50, max = 99, value = 95, width = '300px', post = "%"))
+
+# Checkbox to enable FWER correction for the sample size
+div(style="display: inline-block;vertical-align:bottom;",
+    conditionalPanel(
+      condition = ("input.variations > 2"),
+      checkboxInput("fwer", label = paste("Adjust minimum lift percentage for family-wise",
+                                          "error rate (FWER) -- this only changes results",
+                                          "when working with more than two total variations"), 
+                    value = TRUE)
+    )
+)
+
 ```
 
 This is the **statistical confidence**. The higher you set the statistical confidence, the _less likely_ the statistical results will return a _false difference_ (aka, a false positive or a Type I error).
@@ -189,22 +197,37 @@ output$power_msg <- renderText(ifelse(input$power < 80,
                                            "detect an effect when an effect exists."),
                                     ""))
 
-# Reactive expression to calculate the min effect. We're going to use this
+# Reactive function to adjust the significance level to use Bonferroni 
+# correction - FWER - if selected. Otherwise, just use the base confidence
+# level entered to select alpha
+sig_level <- reactive({
+  if(input$fwer == TRUE){
+    alpha <- (100 - input$confidence) / (100 * (input$variations - 1))
+  } else {
+    alpha <- (100 - input$confidence)/100
+  }
+})
+  
+
+# Reactive function to calculate the min effect. We're going to use this
 # both to output the MDE, as well as to calculate the message that explains
 # how to interpet that
 min_effect_calc <- reactive({
-  
   # Do some checks to cover the corner cases with different messaging
   if(input$power == 50 & input$confidence == 50){
     results <- -1000
   } else {
-    results <- tryCatch(
-      {calc_p2 <- power.prop.test(n = floor((input$runtime * (input$avg_traffic/30)) / input$variations),
+    results <- tryCatch({
+      
+      # Calculate p2
+      calc_p2 <- power.prop.test(n = floor((input$runtime * (input$avg_traffic/30)) / input$variations),
                                   p1 = input$baseline/100,
-                                  sig.level = (100 - input$confidence)/100,
+                                  sig.level = sig_level(),
                                   power = input$power/100,
                                   alternative = input$tail)
-      calc_p2 <- calc_p2$p2/(input$baseline/100) - 1
+      
+      # Calculate the minium detectable effect based on p2
+      mde <- calc_p2$p2/(input$baseline/100) - 1
       },
       error = function(e){
         return(-999)
@@ -216,7 +239,6 @@ min_effect_calc <- reactive({
       results <- -1000
     }
   }
-  
   return(results)
 })
 
@@ -261,6 +283,41 @@ output$range_message <- renderUI({
   HTML(message)
 })
 
+# Function to calculate the minimum effect. This is, really, calculating
+# "p2" -- the second probabiliy -- given the other various inputs. We use
+# this to build the full curve for the plot.
+calc_min_effect <- function(days_running){
+  
+  # Calculate the number of observations per group.
+  n <-  round(days_running * input$avg_traffic / 30 / input$variations,0)
+  
+  # Set p1 as the baseline if the MDE entered is positive, and as the
+  # baseline minus the minimum effect if the MDE is negative
+  p1 <- ifelse(min_effect_calc() > 0,
+               input$baseline/100,
+               input$baseline/100 * (1 + min_effect_calc()))
+  
+  # Run the test to get the results 
+  calc_results <- power.prop.test(n = n,
+                                  p1 = p1,
+                                  sig.level = sig_level(),
+                                  power = input$power/100,
+                                  alternative = input$tail)
+  
+  # Create a data frame that has the # of days run, the minimal positive lift
+  # detectable, and the negative minimal effect detectable. "positive" is a bit
+  # of a misnomer: if the MDE entered is negative, then this is actually a 
+  # negative number
+  result <- data.frame(days = days_running,
+                       lift_pos = ifelse(min_effect_calc() > 0, 
+                                         calc_results$p2/calc_results$p1 - 1,
+                                         (calc_results$p2/calc_results$p1 - 1) * -1)) %>%
+    # If one-tailed, set the base to be zero; otherwise, set it to be the
+    # negative of lift_pos.
+    mutate(lift_neg = ifelse(input$tail == "one.sided", 0, -1*lift_pos))
+  
+}
+
 # Calculate the MDE
 output$min_effect <- renderText({
   
@@ -268,6 +325,7 @@ output$min_effect <- renderText({
   # just flip a coin
   coin_flip_message <- "0 (Just Flip a Coin!)"
   
+  # Call the function to get the MDE
   min_effect <- min_effect_calc()
   
   # Do some checks to cover the corner cases with different messaging
@@ -280,7 +338,7 @@ output$min_effect <- renderText({
       results <- paste0(round(min_effect * 100, digits = 1), "%")
     }
   }
-
+  
   # Return the results
   results
 })
@@ -305,52 +363,21 @@ output$mineffect_time <- renderPlot({
   req(input$variations >= 2)
   req(input$avg_traffic >= 300)   # This would be 10 visit(ors) a day.
 
-  # Function to calculate the minimum effect. This is, really, calculating
-  # "p2" -- the second probabiliy -- given the other various inputs. We use
-  # this to build the full curve for the plot.
-  calc_min_effect <- function(days_running){
-
-    # Calculate the number of observations per group.
-    n <-  round(days_running * input$avg_traffic / 30 / input$variations,0)
-    
-    # Set p1 as the baseline if the MDE entered is positive, and as the
-    # baseline minus the minimum effect if the MDE is negative
-    p1 <- ifelse(min_effect_calc() > 0,
-                 input$baseline/100,
-                 input$baseline/100 * (1 + min_effect_calc()))
-    
-    # Run the test to get the results.
-    calc_results <- power.prop.test(n = n,
-                                    p1 = p1,
-                                    sig.level = (100 - input$confidence)/100,
-                                    power = input$power/100,
-                                    alternative = input$tail)
-    
-    # Create a data frame that has the # of days run, the minimal positive lift
-    # detectable, and the negative minimal effect detectable. "positive" is a bit
-    # of a misnomer: if the MDE entered is negative, then this is actually a 
-    # negative number
-    result <- data.frame(days = days_running,
-                         lift_pos = ifelse(min_effect_calc() > 0, 
-                                           calc_results$p2/calc_results$p1 - 1,
-                                           (calc_results$p2/calc_results$p1 - 1) * -1)) %>%
-      # If one-tailed, set the base to be zero; otherwise, set it to be the
-      # negative of lift_pos.
-      mutate(lift_neg = ifelse(input$tail == "one.sided", 0, -1*lift_pos))
-  }
-
   # Create a data frame with "days" of 1 to 30 and then the minimal
   # detectable affect for each day
   min_by_day <- map_dfr(seq(1:30), calc_min_effect)
   
+  # Get the MDE
+  min_effect <- min_effect_calc()
+
   # Hold on to your socks. We're going to find the first day that is *above*
   # the minimum effect. This will tell us how many days we can expect to need
   # to run the test to detect the minimal lift desired.
   days_needed <- which.min(ifelse(
-    (min_effect_calc() > 0 & min_by_day$lift_pos > min_effect_calc()) |
-      (min_effect_calc() < 0 & min_by_day$lift_pos < min_effect_calc()),
+    (min_effect > 0 & min_by_day$lift_pos > min_effect) |
+      (min_effect < 0 & min_by_day$lift_pos < min_effect),
     NA,
-    abs(min_by_day$lift_pos-min_effect_calc())))
+    abs(min_by_day$lift_pos-min_effect)))
   
   # If the minimum effect can't be hit in 30 days, we don't want to show a
   # line, and we want a message to that effect. So, set a few values to be
@@ -381,17 +408,17 @@ output$mineffect_time <- renderPlot({
   # stuff. That will be a one-row data frame for a one-tailed test and
   # a two-row data frame for a two-tailed test.
   if(input$tail == "one.sided"){
-    min_effect_df <- data.frame(yintercept = min_effect_calc(),
-                                label = paste0(input$min_effect, "%"))
+    min_effect_df <- data.frame(yintercept = min_effect,
+                                label = paste0(round(min_effect * 100, digits = 1), "%"))
   } else {
-    min_effect_df <- data.frame(yintercept = c(min_effect_calc(), -1*min_effect_calc()),
-                                label = c(paste0(input$min_effect, "%"), 
-                                          paste0(-1*input$min_effect, "%")))
+    min_effect_df <- data.frame(yintercept = c(min_effect, -1*min_effect_calc()),
+                                label = c(paste0(round(min_effect * 100, digits = 1), "%"), 
+                                          paste0(-1*round(min_effect * 100, digits = 1), "%")))
   }
   
   # Finally, we're going to need to nudge the labels for the MDE line(s).
   # The degree to nudge them changes whether the MDE is positive or negative
-  nudge_y <- ifelse(input$min_effect > 0,
+  nudge_y <- ifelse(min_effect > 0,
                     min_by_day$lift_pos[20] - min_by_day$lift_pos[30],
                     min_by_day$lift_pos[30] - min_by_day$lift_pos[20])
   

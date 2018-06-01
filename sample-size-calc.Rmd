@@ -99,10 +99,6 @@ numericInput("variations",
              label = NULL, value = 2,
              width = "100px")
 
-# Given the baseline conversion rate entered above`r textOutput("baseline2", inline=TRUE)`, the chart at right shows the minimum lift you can expect to detect based on how long you run the test. You need to be **outside** the gray shaded area to reach statistical significance with the given power & confidence selections below.
-# 
-# The horizontal line is the **Lift %** entered above. Try adjusting that value to see the impact on the expected runtime.
-
 ```
 
 Row {.tabset} 
@@ -130,11 +126,23 @@ How important is it that you do not _**erroneously report a difference**_ when, 
 
 ```{r}
 # Confidence
-sliderInput(inputId = "confidence",
-            label = div(style='width:300px;',
-                        div(style='float:left;', 'Not Important'),
-                        div(style='float:right;', 'Very Important')),
-            min = 50, max = 99, value = 95, width = '300px', post = "%")
+div(style="display: inline-block; vertical-align:top; width: 350px",
+    sliderInput(inputId = "confidence",
+                label = div(style='width:300px;',
+                            div(style='float:left;', 'Not Important'),
+                            div(style='float:right;', 'Very Important')),
+                min = 50, max = 99, value = 95, width = '300px', post = "%"))
+
+# Checkbox to enable FWER correction for the sample size
+div(style="display: inline-block;vertical-align:bottom;",
+    conditionalPanel(
+      condition = ("input.variations > 2"),
+      checkboxInput("fwer", label = paste("Adjust sample size for family-wise error rate (FWER) --",
+                                          "this only changes results when working with more than",
+                                          "two total variations"), value = TRUE)
+    )
+)
+
 ```
 
 This is the **statistical confidence**. The higher you set the statistical confidence, the _less likely_ the statistical results will return a _false difference_ (aka, a false positive or a Type I error).
@@ -159,10 +167,11 @@ Row
 
 ### Sample Size
 
-The **number of visit(or)s per variation** should be at least:
+The **number of visit(or)s** should be at least:
 
 ```{r output}
-h1(textOutput("sample_size"))
+h1(textOutput("sample_size", inline=TRUE), span(style="display: inline-block; font-size:20px;", "per variation"))
+h2(style = "text-align: center;", textOutput("total_visitors", inline=TRUE))
 
 em(htmlOutput("range_message", inline = TRUE))
 
@@ -244,6 +253,38 @@ output$range_message <- renderUI({
   HTML(message)
 })
 
+# Reactive function to adjust the significance level to use 
+# Bonferroni correction - FWER - if selected
+sig_level <- reactive({
+  if(input$fwer == TRUE){
+    alpha <- (100 - input$confidence) / (100 * (input$variations - 1))
+  } else {
+    alpha <-  (100 - input$confidence)/100
+  }
+})
+
+# Reactive function to do the actual sample size calculation. This has error
+# checking baked in. And, it returns a number or a string
+calc_results <- reactive({
+  tryCatch(
+      {
+        # Calculate the result
+        calc_n <- power.prop.test(p1 = input$baseline/100,
+                                  p2 = (input$baseline/100) * (1 + input$min_effect/100),
+                                  sig.level = sig_level(),
+                                  power = input$power/100,
+                                  alternative = input$tail)
+        
+        # Extract the sample size from the returned list and return it
+        return(calc_n$n)
+      },
+      error = function(e){
+        return("N/A")
+      }
+    )
+})
+
+
 # Calculate the sample size
 output$sample_size <- renderText({
   
@@ -255,28 +296,42 @@ output$sample_size <- renderText({
   if(input$power == 50 & input$confidence == 50){
     results <- coin_flip_message
   } else {
-    results <- tryCatch(
-      {calc_n <- power.prop.test(p1 = input$baseline/100,
-                                 p2 = (input$baseline/100) * (1 + input$min_effect/100),
-                                 sig.level = (100 - input$confidence)/100,
-                                 power = input$power/100,
-                                 alternative = input$tail)
-      calc_n <- format(round(calc_n$n), big.mark=",", scientific = FALSE)
-      },
-      error = function(e){
-        return("N/A")
-      }
-    )
+    results <- calc_results()  # Get the results. 
     
-    # One more check to see if things landed such that we still rounded to 0
-    if(results == 0){
-      results <- coin_flip_message
+    # Check if the results returned N/A
+    if(results == "N/A"){
+      results <- results   # Just pass through "N/A"
+    } else {
+      # Check to see if things landed such that we still rounded to 0
+      if(results == 0){
+        results <- coin_flip_message
+      } else {
+        # Return... a nice number if that's what we've got
+        results <- format(round(results), big.mark=",", scientific = FALSE)
+      }
     }
   }
   
   # Return the results
   results
 })
+
+# Calculate the total visitors required -- just the # per variation times
+# the number of variations
+output$total_visitors <- renderText({
+  
+  results <- calc_results()  # Get the results. 
+  if((input$power == 50 & input$confidence == 50) |
+     results == "N/A" | results == 0 ){
+    results <- ""
+  } else {
+    results <-  paste0("(",
+                       format(round(results * input$variations), big.mark=",", scientific = FALSE),
+                       " total visitors)")
+  }
+})
+
+
 ```
 
 Row  {data-height=400}
@@ -317,7 +372,7 @@ output$mineffect_time <- renderPlot({
     # Run the test to get the results.
     calc_results <- power.prop.test(n = n,
                                     p1 = p1,
-                                    sig.level = (100 - input$confidence)/100,
+                                    sig.level = sig_level(),
                                     power = input$power/100,
                                     alternative = input$tail)
     

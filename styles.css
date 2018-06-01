@@ -35,6 +35,13 @@ h1 {
   text-align: center;
 }
 
+h2 {
+  font-family: "adelle-sans",helvetica,arial,sans-serf;
+  font-size: 22px;
+  text-align: center;
+  line-height: 0.8;
+}
+
 h3 {
   font-family: "adelle-sans",helvetica,arial,sans-serf;
   font-size: 18px;
@@ -63,12 +70,10 @@ h3 {
   background-color: #eeeeee;
 }
 
-
-
-/* Center the numeric sliders */
+/* Indent the numeric sliders a bit */
 .shiny-input-container:not(.shiny-input-container-inline) {
-  margin-left: auto;
-  margin-right: auto;
+  margin-left: 50px;
+/*  margin-right: auto; */
 }
 
 /* One-tailed vs. two-tailed radio buttons */
