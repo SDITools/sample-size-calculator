@@ -121,7 +121,7 @@ div(style="display: inline-block;vertical-align:bottom;",
     conditionalPanel(
       condition = ("input.variations > 2"),
       checkboxInput("fwer", label = paste("Adjust minimum lift percentage for family-wise",
-                                          "error rate (FWER) -- this only changes results",
+                                          "error rate (FWER) using Bonferroni correction. This only changes results",
                                           "when working with more than two total variations"), 
                     value = TRUE)
     )

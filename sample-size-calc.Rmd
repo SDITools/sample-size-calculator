@@ -137,9 +137,9 @@ div(style="display: inline-block; vertical-align:top; width: 350px",
 div(style="display: inline-block;vertical-align:bottom;",
     conditionalPanel(
       condition = ("input.variations > 2"),
-      checkboxInput("fwer", label = paste("Adjust sample size for family-wise error rate (FWER) --",
-                                          "this only changes results when working with more than",
-                                          "two total variations"), value = TRUE)
+      checkboxInput("fwer", label = paste("Adjust sample size for family-wise error rate (FWER) using",
+                                          "Bonferroni correction. This only changes results when working with more than",
+                                          "two total variations."), value = TRUE)
     )
 )
 
