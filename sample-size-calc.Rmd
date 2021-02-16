@@ -20,6 +20,7 @@ library(RColorBrewer)
 library(scales)
 library(rvg)       # For interactive / tooltips
 library(ggiraph)   # For interactive / tooltips
+
 ```
 
 Row
@@ -66,13 +67,13 @@ output$liftmessage <- renderUI({
     # Build the actual string
     if(input$tail == "one.sided"){
       message = HTML("<div style=\"font-style: italic;\">This means you're looking to detect a change in the ",
-                       "conversion rate from <strong>", baseline, "</strong> to <strong>", 
-                       p2_val_1, "</strong>.</div>")
+                     "conversion rate from <strong>", baseline, "</strong> to <strong>", 
+                     p2_val_1, "</strong>.</div>")
     } else {
       message = HTML("<div style=\"font-style: italic;\">This means you're looking to detect a change in the ",
-                       "conversion rate from <strong>", baseline, "</strong> to <strong>", 
-                       p2_val_1, "</strong> OR from <strong>", baseline, "</strong> to <strong>",
-                       p2_val_2, "</strong> (as a two-tailed test).</div>")
+                     "conversion rate from <strong>", baseline, "</strong> to <strong>", 
+                     p2_val_1, "</strong> OR from <strong>", baseline, "</strong> to <strong>",
+                     p2_val_2, "</strong> (as a two-tailed test).</div>")
     }
   }
 })
@@ -198,12 +199,12 @@ output$baseline <- renderText(paste0(input$baseline,"%"))
 # This one gets embedded in a paragraph in a parenthetical, and we want it to just
 # disappear if there is no value yet.
 output$baseline2 <- renderText({
-    if(is.na(input$baseline) | input$baseline == 0){
-      output_value <- ""
-    } else {
-      output_value <- paste0(" (",input$baseline,"%)")
-    }
-  })
+  if(is.na(input$baseline) | input$baseline == 0){
+    output_value <- ""
+  } else {
+    output_value <- paste0(" (",input$baseline,"%)")
+  }
+})
 
 # Back to simpleer ones
 output$power <- renderText(input$power)
@@ -212,10 +213,10 @@ output$tail <- renderText(ifelse(input$tail == "one.sided", "One-tailed", "Two-t
 
 # Create a warning message if Power is set below 80%
 output$power_msg <- renderText(ifelse(input$power < 80,
-                                    paste0("CAUTION: We recommend a minimum 80%. Statistical ",
-                                           "power is the likelihood that you will be able to ",
-                                           "detect an effect when an effect exists."),
-                                    ""))
+                                      paste0("CAUTION: We recommend a minimum 80%. Statistical ",
+                                             "power is the likelihood that you will be able to ",
+                                             "detect an effect when an effect exists."),
+                                      ""))
 
 # Create the couple of messages that make it clear as to what ranges are being tested.
 # If it's one-tailed, it's just in one direction. If it's two-tailed, then it's in two (duh).
@@ -267,21 +268,21 @@ sig_level <- reactive({
 # checking baked in. And, it returns a number or a string
 calc_results <- reactive({
   tryCatch(
-      {
-        # Calculate the result
-        calc_n <- power.prop.test(p1 = input$baseline/100,
-                                  p2 = (input$baseline/100) * (1 + input$min_effect/100),
-                                  sig.level = sig_level(),
-                                  power = input$power/100,
-                                  alternative = input$tail)
-        
-        # Extract the sample size from the returned list and return it
-        return(calc_n$n)
-      },
-      error = function(e){
-        return("N/A")
-      }
-    )
+    {
+      # Calculate the result
+      calc_n <- power.prop.test(p1 = input$baseline/100,
+                                p2 = (input$baseline/100) * (1 + input$min_effect/100),
+                                sig.level = sig_level(),
+                                power = input$power/100,
+                                alternative = input$tail)
+      
+      # Extract the sample size from the returned list and return it
+      return(calc_n$n)
+    },
+    error = function(e){
+      return("N/A")
+    }
+  )
 })
 
 
@@ -351,7 +352,7 @@ output$mineffect_time <- renderPlot({
   req(input$avg_traffic > 0)
   req(input$variations >= 2)
   req(input$avg_traffic >= 300)   # This would be 10 visit(ors) a day.
-
+  
   # Function to calculate the minimum effect. This is, really, calculating
   # "p2" -- the second probabiliy -- given the other various inputs. The wrinkle
   # is that power.prop.test, if only given p1, assumes p2 is *higher*. So, in
@@ -359,7 +360,7 @@ output$mineffect_time <- renderPlot({
   # only matters for one-tailed tests, actually, but there's no harm in it
   # being the case for two-tailed.
   calc_min_effect <- function(days_running){
-
+    
     # Calculate the number of observations per group.
     n <-  round(days_running * input$avg_traffic / 30 / input$variations,0)
     
@@ -388,7 +389,7 @@ output$mineffect_time <- renderPlot({
       # negative of lift_pos.
       mutate(lift_neg = ifelse(input$tail == "one.sided", 0, -1*lift_pos))
   }
-
+  
   # Create a data frame with "days" of 1 to 30 and then the minimal
   # detectable affect for each day
   min_by_day <- map_dfr(seq(1:30), calc_min_effect)
@@ -411,7 +412,7 @@ output$mineffect_time <- renderPlot({
       duration_message <-  as.character(days_needed)
     }
     duration_message
-    })
+  })
   
   # If the minimum effect can't be hit in 30 days, we don't want to show a
   # line, and we want a message to that effect. So, set a few values to be
@@ -466,17 +467,17 @@ output$mineffect_time <- renderPlot({
     # Draw the shaded band
     geom_ribbon(mapping = aes(x = days, ymin = lift_neg, ymax = lift_pos),
                 alpha = 0.1) +
-
+    
     # Draw the x-axis and y-axis
     geom_hline(aes(yintercept = 0), colour = "gray10") +
     geom_vline(aes(xintercept = 0)) +
-
+    
     # Draw the minimum effect line(s)
     geom_hline(data = min_effect_df,
                mapping = aes(yintercept = yintercept), colour = "#416fba",
                size = 1, linetype = "dashed") +
-
-
+    
+    
     # Add a text label to the minimum effect line(s)
     geom_text(data = min_effect_df,
               mapping = aes(x = 30, y = yintercept,
@@ -484,7 +485,7 @@ output$mineffect_time <- renderPlot({
               vjust = 0, hjust = 1, fontface = "bold", colour = "#416fba",
               nudge_y = nudge_y,
               size = 4.5) +
-
+    
     # Draw the "days needed" line and text
     geom_vline(aes(xintercept = days_needed_x_intercept), colour = "#416fba",
                size = days_size, linetype = "dashed") +
@@ -493,7 +494,7 @@ output$mineffect_time <- renderPlot({
                             label = days_text_val),
               hjust = days_text_hjust, fontface = "bold", colour = "#416fba",
               nudge_x = days_text_nudge, size = 4.5) +
-
+    
     # Draw the intersection point(s)
     geom_point(data = min_effect_df,
                aes(x = xintercept, y = yintercept),
@@ -557,7 +558,7 @@ output$error_matrix <- renderggiraph({
                                    paste0("False Difference\n", 100 - input$confidence, "%"),
                                    paste0("False \"No Difference\"\n", 100 - input$power, "%"), 
                                    paste0("True \"No Difference\"\n", input$confidence, "%")),
-
+                         
                          # The min and max coords for the false positive/false negative quadrants
                          rect_max_error = c(0, (100*(100-input$confidence))^0.5, 100,0),
                          rect_min_error = c(0,0, 100 - (100*(100-input$power))^0.5,0),
@@ -579,11 +580,11 @@ output$error_matrix <- renderggiraph({
                          # The tooltips used for each rectangle
                          tooltips_error = c("", 
                                             paste0("If there truly is NOT a difference, ",
-                                                  100 - input$confidence, "% of the time, the test ",
-                                                  "will INCORRECTLY report there IS a difference."), 
+                                                   100 - input$confidence, "% of the time, the test ",
+                                                   "will INCORRECTLY report there IS a difference."), 
                                             paste0("If there truly IS a difference, ",
-                                                  100 - input$power, "% of the time, the test ",
-                                                  "will INCORRECTLY report there is NOT a difference."), 
+                                                   100 - input$power, "% of the time, the test ",
+                                                   "will INCORRECTLY report there is NOT a difference."), 
                                             ""),
                          tooltips_good = c(paste0("If there truly IS a difference, ",
                                                   input$power, "% of the time, the test ",
@@ -594,23 +595,23 @@ output$error_matrix <- renderggiraph({
                                                   input$confidence, "% of the time, the test ",
                                                   "will (correctly) report there is not a difference."))
                          
-                         )
+  )
   
   # Build the plot
   error_gg <- ggplot(data = error_df, mapping = aes(label = label)) +
-
+    
     # Fill in the "Correct Conclusion" quadrants as green
     geom_rect_interactive(aes(xmin = rect_min_good_x, xmax = rect_max_good_x,
-                  ymin = rect_min_good_y, ymax = rect_max_good_y,
-                  tooltip = tooltips_good),
-              fill = "#B8D8BA") +
-   
+                              ymin = rect_min_good_y, ymax = rect_max_good_y,
+                              tooltip = tooltips_good),
+                          fill = "#B8D8BA") +
+    
     # Draw the rectangles that will show how much the risk is
     geom_rect_interactive(aes(xmin = rect_min_error, xmax = rect_max_error,
-                  ymin = rect_min_error, ymax = rect_max_error,
-                  tooltip = tooltips_error),
-              fill = "#EF959D") +
-
+                              ymin = rect_min_error, ymax = rect_max_error,
+                              tooltip = tooltips_error),
+                          fill = "#EF959D") +
+    
     # Draw the "coin toss" box
     geom_rect(aes(xmin = rect_min_coin_x, xmax = rect_max_coin_x,
                   ymin = rect_min_coin_y, ymax = rect_max_coin_y),
@@ -619,7 +620,7 @@ output$error_matrix <- renderggiraph({
     # Draw the axes
     geom_hline(aes(yintercept=c(0,0,100,100)), size=1, colour="gray40") +
     geom_vline(aes(xintercept=c(100,0,100,0)), size=1, colour="gray40") +
-
+    
     # Label the four quadrants
     geom_text(aes(x=50, y=c(50,50,50,50)), size = 5, fontface = "bold") +
     
@@ -648,3 +649,22 @@ Row
 -----------------------------
 
 _This calculator is built with R using the `power.prop.test()` function (for the actual calculations), which performs a two-sample test for proportions. Read more in the [documentation for the function](https://www.rdocumentation.org/packages/stats/versions/3.4.3/topics/power.prop.test)._
+
+<div style="display: none;">
+```{r url_bookmarking}
+# The code below uses query parameters in the URL of the page so that the total configuration 
+# is captured in the URL, enabling someone to "come back" to the exact configuration at any point.
+# See details at: https://shiny.rstudio.com/reference/shiny/1.5.0/updateQueryString.html.
+# This chunk is wrapped in a <div> that sets the display to none because, otherwise, a little
+# bit of JS gets rendered that chunk options are unable to turn off.
+enableBookmarking("url")
+observe({
+  # Trigger this observer every time an input changes
+  reactiveValuesToList(input)
+  session$doBookmark()
+})
+onBookmarked(function(url) {
+  updateQueryString(url)
+})
+```
+</div>

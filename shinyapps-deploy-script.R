@@ -11,7 +11,6 @@ deployApp(appFiles = c("sample-size-calc.Rmd","styles.css", "tracking.html"),
           appTitle = "Sample Size Calculator",
           account = "sdidev")
 
-
 deployApp(appFiles = c("sample-size-calc-runtime.Rmd","styles.css", "tracking.html"),
           appName = "sample-size-calculator-runtime",
           appTitle = "Sample Size Calculator - Runtime-Based",
