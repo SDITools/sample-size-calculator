@@ -1,0 +1,167 @@
+/* Import font
+@import url('https://fonts.googleapis.com/css?family=Lato');
+
+/* LOTS of stuff here just to get the navigation bar in order */
+
+.navbar-inverse {
+  background-color: #221f20;
+  border-color: none;
+  padding: 10px;
+}
+
+.navbar-right {
+  font-family: "Lato",helvetica,arial,sans-serif;
+  position: absolute;
+  display: block;
+  font-size: 1.2em;
+  color: white;
+}
+
+ul.nav.navbar-nav.navbar-right {
+  background: #009CAB;
+  visibility: visible;
+  opacity: 1;
+  display: block;
+  min-width: 300px;
+  position: relative;
+  transition: all 0.5s ease;
+  padding: 12px 10px 12px 10px;
+}
+
+ul.nav.navbar-nav.navbar-right::before {
+  content: "More Experimentation Tools";
+  }
+
+ul.nav.navbar-nav.navbar-right:hover > li
+{
+  visibility: visible;
+  opacity: 1;
+  display: block;
+}
+
+ul.nav.navbar-nav.navbar-right li {
+  color: #fff;
+  display: none;
+  visibility: hidden;
+  opacity: 0;
+  float: left;
+  padding: 0;
+  position: relative;
+  transition-duration: 0.5s;
+}
+  
+ul.nav.navbar-nav.navbar-right li a {
+  color: #fff;
+  font-weight: normal;
+  font-size: 0.9em;
+    padding: 5px 0 5px 5px;
+}
+
+ul.nav.navbar-nav.navbar-right li:hover {
+  background: #00727C;
+}
+
+ul.nav.navbar-nav.navbar-right li>a:hover {
+  background-color: #004D53;
+}
+
+ul.nav.navbar-nav.navbar-right li {
+  clear: both;
+  width: 100%;
+}
+
+/* End all the stuff for the global nav */
+
+body {
+  padding-top: 8px;
+  background-color: #f4f4f4;
+}
+
+/* Set the main body/text font */
+p, a {
+    font-family: "Lato",helvetica,arial,sans-serif;
+    font-size:1.1em;
+}
+
+/* The ggiraph package does a weird overwriting of the text style */
+/* and makes it a serif font. So, this corrects for that */
+text {
+     font-family: "Lato",helvetica,arial,sans-serif;
+}
+
+/* Tabsets try to resize to be wayyyy to tall. So, overwrite that. */
+#section-row-1 {
+    height: 250px;
+    flex: 0 0 250px !important;
+}
+
+/* Main results output */
+h1 {
+  font-family: "adelle-sans",helvetica,arial,sans-serf;
+  font-size: 48px;
+  font-weight: bold;
+  color: #416fba;
+  text-align: center;
+}
+
+h2 {
+  font-family: "adelle-sans",helvetica,arial,sans-serf;
+  font-size: 22px;
+  text-align: center;
+  line-height: 0.8;
+}
+
+h3 {
+  font-family: "adelle-sans",helvetica,arial,sans-serf;
+  font-size: 18px;
+  text-align: center;
+}
+
+/* Titles at the top of each panel */
+.chart-title {
+  font-family: "adelle-sans",helvetica,arial,sans-serf;
+  font-size: 16px;
+  font-weight: bold;
+  color: #444;
+}
+
+/* Tabset text */
+#section-row-1 > ul > li > a {
+  font-family: "adelle-sans",helvetica,arial,sans-serf;
+  font-size: 16px;
+  font-weight: bold;
+  color: #444;
+  border-color: #cccccc;
+}
+
+/* Make the tabset tabs look more visibly like tabs */
+#section-row-1 > ul > li:not(.active) > a {
+  background-color: #eeeeee;
+}
+
+/* Indent the numeric sliders a bit */
+.shiny-input-container:not(.shiny-input-container-inline) {
+  margin-left: 50px;
+/*  margin-right: auto; */
+}
+
+/* One-tailed vs. two-tailed radio buttons */
+#tail {
+  width: 95%;
+}
+
+/* Overall app title */
+.navbar-brand {
+  font-size: 19px;
+}
+
+/* Numerical inputs */
+.form-control {
+  font-size: 17px;
+  padding: 0 10px;
+  background-color: #bdd4f9;
+  border: none;
+  height: 30px;
+}
+
+
