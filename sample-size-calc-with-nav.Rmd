@@ -127,7 +127,7 @@ Is your hypothesis _directional_ (e.g., you expect the conversion rate to increa
 
 ```{r}
 # One-tailed or two-tailed
-radioButtons("tail", label = NA,
+radioButtons("tail", label = NULL,
              choices = list("My hypothesis is directional and I want to test if B is BETTER than A (1-tailed)" = "one.sided", 
                             "My hypothesis is non-directional and I want to test if B is DIFFERENT than A (2-tailed)" = "two.sided"), 
              selected = "one.sided")
