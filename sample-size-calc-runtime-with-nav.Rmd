@@ -183,7 +183,7 @@ h3("Confidence:", strong(textOutput("confidence", inline = TRUE),"%"))
 h3("Power:", strong(textOutput("power", inline = TRUE),"%"))
 ```
 
-The impact of these values values is reflected in the diagram below. The gray dotted line reflects a coin toss (statistical power = 50% and statistical confidence = 50%).
+The impact of these values is reflected in the diagram below. The gray dotted line reflects a coin toss (statistical power = 50% and statistical confidence = 50%).
 
 ```{r calculations}
 # Return each of the input values so they can be re-displayed. We have to repeat some
