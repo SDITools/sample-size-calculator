@@ -146,7 +146,7 @@ div(style="display: inline-block;vertical-align:bottom;",
 
 ```
 
-This is the **statistical confidence**. The higher you set the statistical confidence, the _less likely_ the statistical results will return a _false difference_ (aka, a false positive or a Type I error).
+This is the **statistical confidence**. The higher you set the statistical confidence, the _less likely_ the statistical results will return a _false detection_ (aka, a false positive or a Type I error).
 
 ### 5. Select Power ($1 - \beta$)
 
@@ -161,7 +161,7 @@ sliderInput(inputId = "power",
             min = 50, max = 99, value = 80, width = "300px", post = "%")
 ```
 
-The _higher_ you set the statistical power, the greater your likelihood of detecting a real difference if one exists and the less likely you will return a false “no difference” (aka, a false negative or a Type II error).`r tags$span(style="color:red; font-style:italic;", textOutput("power_msg", inline = TRUE))`
+The _higher_ you set the statistical power, the greater your likelihood of detecting a real difference if one exists and the less likely you will fail to detect a difference (aka, a false negative or a Type II error).`r tags$span(style="color:red; font-style:italic;", textOutput("power_msg", inline = TRUE))`
 
 Row
 -----------------------------
@@ -331,11 +331,9 @@ output$total_visitors <- renderText({
                        " total visitors)")
   }
 })
-
-
 ```
 
-Row  {data-height=400}
+Row {data-height=550}
 -----------------------------
 
 ### Runtime Based on Lift %
@@ -555,8 +553,8 @@ output$error_matrix <- renderggiraph({
                                            "NO DIFFERENCE", "NO DIFFERENCE"),
                                          levels = c("DIFFERENCE", "NO DIFFERENCE")),
                          label = c(paste0("True Difference\n", input$power, "%"), 
-                                   paste0("False Difference\n", 100 - input$confidence, "%"),
-                                   paste0("False \"No Difference\"\n", 100 - input$power, "%"), 
+                                   paste0("False Detection\n", 100 - input$confidence, "%"),
+                                   paste0("Failure to Detect\n", 100 - input$power, "%"), 
                                    paste0("True \"No Difference\"\n", input$confidence, "%")),
                          
                          # The min and max coords for the false positive/false negative quadrants
